@@ -3,7 +3,7 @@
 ## Title: AutoVendor
 ## Notes: Sells gray and marked items and repairs gear at vendors. Suggests what to delete when your bags are full. Alt+click marks an item to sell, Alt+right-click protects it.
 ## Author: Korcraft
-## Version: 0.6.1
+## Version: 0.6.2
 ## SavedVariables: AutoVendorDB
 ## OptionalDeps: Baganator
 

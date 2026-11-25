@@ -1,6 +1,10 @@
 -- BagSpace: when your bags fill up, names the item you'd lose the least by
 -- deleting. It never deletes anything itself.
 --
+-- Open your bags while they're full and the cheapest item gets a pink
+-- outline. Delete it and the next cheapest lights up, and so on, until you
+-- close your bags. Next time they're full and you open them, it starts again.
+--
 -- How it picks:
 --   * Items you marked to sell (Alt+left-click) come first: you already said
 --     they're junk.
@@ -211,10 +215,61 @@ local function keyOf(e)
 	return e and (e.bag .. ":" .. e.slot .. ":" .. e.itemID) or nil
 end
 
+-- ---------------------------------------------------------------------------
+-- Delete mode: starts when your bags are full and a bag window is open. It
+-- then keeps pointing at the next cheapest item after each delete -- even
+-- once there's free space -- until you close your bags.
+-- ---------------------------------------------------------------------------
+
+local bagOpen = false
+local deleteMode = false
+
+-- Baganator's backpack windows are named after its skin ("frame group"), so
+-- they're found by name prefix. Looked up again if none are found yet.
+local baganatorBackpacks = {}
+local lastBaganatorSearch = -math.huge
+local function findBaganatorBackpacks()
+	-- Walking all globals isn't free, so at most once every 5 seconds.
+	if GetTime() - lastBaganatorSearch < 5 then return end
+	lastBaganatorSearch = GetTime()
+	local found = {}
+	pcall(function()
+		for name, value in pairs(_G) do
+			if type(name) == "string" and type(value) == "table"
+				and (name:find("^Baganator_SingleViewBackpackViewFrame")
+					or name:find("^Baganator_CategoryViewBackpackViewFrame"))
+				and type(value.IsShown) == "function" then
+				found[#found + 1] = value
+			end
+		end
+	end)
+	baganatorBackpacks = found
+end
+
+local function isAnyBagOpen()
+	for i = 1, (NUM_CONTAINER_FRAMES or 13) do
+		local f = _G["ContainerFrame" .. i]
+		if f and f:IsShown() then return true end
+	end
+	if ContainerFrameCombinedBags and ContainerFrameCombinedBags:IsShown() then return true end
+	if Baganator then
+		if #baganatorBackpacks == 0 then findBaganatorBackpacks() end
+		for _, f in ipairs(baganatorBackpacks) do
+			if f:IsShown() then return true end
+		end
+	end
+	return false
+end
+
 local function rescan()
 	local ranked, _, free = scan()
 	local old = keyOf(candidate)
-	candidate = (free == 0 and ns.BagSpaceEnabled()) and ranked[1] or nil
+	if not bagOpen then
+		deleteMode = false
+	elseif free == 0 then
+		deleteMode = true
+	end
+	candidate = (deleteMode and ns.BagSpaceEnabled()) and ranked[1] or nil
 	local wasFree = freeSlots
 	freeSlots = free
 	if keyOf(candidate) ~= old then ns.RefreshVisuals() end
@@ -222,7 +277,18 @@ local function rescan()
 end
 ns.RescanBagSpace = rescan
 
--- The slot currently suggested for deletion (only while bags are full).
+-- Watches for bag windows opening and closing (any bag UI).
+local function watchBags()
+	C_Timer.NewTicker(0.2, function()
+		local open = isAnyBagOpen()
+		if open ~= bagOpen then
+			bagOpen = open
+			rescan()
+		end
+	end)
+end
+
+-- The slot currently suggested for deletion (only in delete mode).
 function ns.GetDeleteSuggestion()
 	return candidate
 end
@@ -370,6 +436,7 @@ events:SetScript("OnEvent", function(_, event, _, message)
 	if event == "PLAYER_LOGIN" then
 		registerWithBaganator()
 		rescan()
+		watchBags()
 	elseif event == "BAG_UPDATE_DELAYED" then
 		local wasFree = rescan()
 		-- Announce only the moment the bags fill, not on every later change.
