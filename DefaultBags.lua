@@ -2,13 +2,13 @@
 -- for the game's own bag windows, plus tooltip lines that show up in any bag
 -- UI that uses the standard bag tooltip.
 --   red outline + X   = protected (never sold or suggested for deletion)
---   bright blue outline = suggested to delete while your bags are full
+--   purple outline      = suggested to delete while your bags are full
 
 local _, ns = ...
 
 local THICKNESS = 2
 local RED = { 0.9, 0.1, 0.1 }
-local BLUE = { 0.1, 0.75, 1 } -- brighter than the blue (rare) quality border
+local PURPLE = { 0.8, 0.3, 1 }
 
 -- ---------------------------------------------------------------------------
 -- Finding the default bag buttons
@@ -96,7 +96,7 @@ local function setUp(button)
 	x:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
 	x:Hide()
 	m.protectX = x
-	m.suggestOutline = makeOutline(button, BLUE)
+	m.suggestOutline = makeOutline(button, PURPLE)
 	button.AutoVendorMarkers = m
 	button:HookScript("OnClick", onClick)
 	return m
@@ -151,7 +151,7 @@ local function addTooltipLines(tooltip, bag, slot)
 	end
 	local s = ns.GetDeleteSuggestion and ns.GetDeleteSuggestion()
 	if s and s.bag == bag and s.slot == slot then
-		tooltip:AddLine("AutoVendor: least valuable item - suggested to delete", BLUE[1], BLUE[2], BLUE[3])
+		tooltip:AddLine("AutoVendor: least valuable item - suggested to delete", PURPLE[1], PURPLE[2], PURPLE[3])
 		added = true
 	end
 	if added then tooltip:Show() end
