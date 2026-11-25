@@ -6,7 +6,8 @@ A small World of Warcraft addon (WoW Forever client).
 - **Mark items to sell:** Alt+left-click an item in your bags (again to unmark). It gets a gold coin and is sold along with the grays at the next vendor.
 - **Protect items:** Alt+right-click an item in your bags (again to unprotect). Protected items are never sold or suggested for deletion, get a red outline, and say so in their tooltip.
 - Both work in the default bags and in [Baganator](https://www.curseforge.com/wow/addons/baganator); with any other bag addon type `/av sell` or `/av protect` and Shift+click the item. Marks are per item type and shared by all your characters.
-- **Bags full?** AutoVendor tells you the least valuable item to delete:
+- **Special bags:** when your normal bags fill up, items that belong in a special bag (ammo in a quiver or ammo pouch, leather in a leatherworking bag, herbs in an herb bag...) are moved there automatically if it has a free slot.
+- **Bags full?** AutoVendor tells you the least valuable item to delete. Only your normal bags count - special bags are ignored:
   - items you marked to sell come first
   - never suggests protected items, profession/gathering tools (skinning knife, mining pick, fishing poles...), quest items, keys, or items with no vendor price
   - food, drink, potions, reagents and ammo are only suggested as a last resort

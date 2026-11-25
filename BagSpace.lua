@@ -87,6 +87,14 @@ local function isOrdinaryBag(bag)
 	return family == 0
 end
 
+local function ordinaryFreeSlots()
+	local free = 0
+	for bag = FIRST_BAG, LAST_BAG do
+		if isOrdinaryBag(bag) then free = free + (C_Container.GetContainerNumFreeSlots(bag) or 0) end
+	end
+	return free
+end
+
 local function isQuestItem(bag, slot, classID)
 	if classID == CLASS_QUEST then return true end
 	if C_Container.GetContainerItemQuestInfo then
@@ -438,6 +446,11 @@ events:SetScript("OnEvent", function(_, event, _, message)
 		rescan()
 		watchBags()
 	elseif event == "BAG_UPDATE_DELAYED" then
+		-- Bags just full? First try moving things into special bags (ammo
+		-- into the quiver, etc.); the moves trigger another bag update.
+		if ns.MoveToSpecialBags and ordinaryFreeSlots() == 0 and ns.MoveToSpecialBags() > 0 then
+			return
+		end
 		local wasFree = rescan()
 		-- Announce only the moment the bags fill, not on every later change.
 		if freeSlots == 0 and wasFree and wasFree > 0 and not merchantOpen() and ns.BagSpaceEnabled() then
@@ -445,6 +458,9 @@ events:SetScript("OnEvent", function(_, event, _, message)
 			announce()
 		end
 	elseif event == "UI_ERROR_MESSAGE" then
+		if message == ERR_INV_FULL and ns.MoveToSpecialBags and ns.MoveToSpecialBags() > 0 then
+			return
+		end
 		if message == ERR_INV_FULL and ns.BagSpaceEnabled()
 			and GetTime() - lastFullWarning > FULL_ERROR_THROTTLE then
 			lastFullWarning = GetTime()
