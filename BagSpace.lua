@@ -199,22 +199,25 @@ local function announce()
 	print(line)
 end
 
-local function refreshBaganator()
-	if Baganator and Baganator.API and Baganator.API.RequestItemButtonsRefresh then
-		Baganator.API.RequestItemButtonsRefresh()
-	end
+local function keyOf(e)
+	return e and (e.bag .. ":" .. e.slot .. ":" .. e.itemID) or nil
 end
 
 local function rescan()
 	local ranked, _, free = scan()
-	local old = candidate and candidate.itemID
+	local old = keyOf(candidate)
 	candidate = (free == 0) and ranked[1] or nil
 	local wasFree = freeSlots
 	freeSlots = free
-	if (candidate and candidate.itemID) ~= old then refreshBaganator() end
+	if keyOf(candidate) ~= old then ns.RefreshVisuals() end
 	return wasFree
 end
 ns.RescanBagSpace = rescan
+
+-- The slot currently suggested for deletion (only while bags are full).
+function ns.GetDeleteSuggestion()
+	return candidate
+end
 
 local function merchantOpen()
 	return MerchantFrame and MerchantFrame:IsShown()
@@ -376,10 +379,21 @@ end)
 SLASH_AUTOVENDOR1 = "/autovendor"
 SLASH_AUTOVENDOR2 = "/av"
 SlashCmdList.AUTOVENDOR = function(msg)
-	msg = (msg or ""):lower():match("^%s*(.-)%s*$")
-	if msg == "space" then
+	msg = (msg or ""):match("^%s*(.-)%s*$")
+	local command, rest = msg:match("^(%S*)%s*(.-)$")
+	command = command:lower()
+	if command == "space" then
 		showReport()
+	elseif command == "protect" then
+		-- Works with any bag addon: type /av protect, then Shift+click the item.
+		local itemID = tonumber(rest:match("item:(%d+)") or rest)
+		if itemID then
+			ns.ToggleProtected(itemID, rest:match("|c.-|r"))
+		else
+			print(ns.PREFIX .. "Type /av protect and then Shift+click an item to protect or unprotect it.")
+		end
 	else
 		print(ns.PREFIX .. "/av space - show what to delete when your bags are full.")
+		print(ns.PREFIX .. "/av protect [item] - protect or unprotect an item (or Alt+click it in your bags).")
 	end
 end

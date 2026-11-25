@@ -1,11 +1,12 @@
 ## Interface: 16001
 ## Interface-Camelot: 16001
 ## Title: AutoVendor
-## Notes: Sells gray items and repairs gear at vendors. When your bags fill up, tells you the least valuable item to delete. Alt+click an item in Baganator to protect it.
+## Notes: Sells gray items and repairs gear at vendors. When your bags fill up, tells you the least valuable item to delete. Alt+click an item in your bags to protect it.
 ## Author: Korcraft
-## Version: 0.3.0
+## Version: 0.4.0
 ## SavedVariables: AutoVendorDB
 ## OptionalDeps: Baganator
 
 AutoVendor.lua
 BagSpace.lua
+DefaultBags.lua

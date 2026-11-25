@@ -2,10 +2,11 @@
 -- then repairs all gear with your own gold if this merchant can repair.
 -- Selling goes first so the sale money can help pay for the repair.
 --
--- Protected items: Alt+left-click an item in your Baganator bags to protect
--- it (again to unprotect). Protected items are never auto-sold and get a red
--- outline with an X, as a reminder not to sell them by hand either.
--- Protection is by item type, shared by all your characters.
+-- Protected items: Alt+left-click an item in your bags (default bags or
+-- Baganator) to protect it, again to unprotect; with any other bag addon use
+-- /av protect [item link]. Protected items are never auto-sold or suggested
+-- for deletion and get a red outline with an X, as a reminder not to sell
+-- them by hand either. Protection is by item type, shared by all characters.
 
 local _, ns = ...
 
@@ -116,27 +117,41 @@ local function sellPass(id, state)
 end
 
 -- ---------------------------------------------------------------------------
--- Protection marker in Baganator
+-- Protecting items (shared by every bag UI) and redrawing markers
 -- ---------------------------------------------------------------------------
 
-local OUTLINE_COLOR = { 0.9, 0.1, 0.1, 1 }
-local OUTLINE_THICKNESS = 2
+-- Redraws protection and delete-suggestion markers in whichever bag UIs exist.
+function ns.RefreshVisuals()
+	if Baganator and Baganator.API and Baganator.API.RequestItemButtonsRefresh then
+		Baganator.API.RequestItemButtonsRefresh()
+	end
+	if ns.RefreshDefaultBags then ns.RefreshDefaultBags() end
+end
 
 local function toggleProtected(itemID, itemLink)
+	if not AutoVendorDB then return end
 	local label = itemLink or ("item " .. itemID)
 	if isProtected(itemID) then
 		AutoVendorDB.protected[itemID] = nil
 		print(PREFIX .. label .. " is no longer protected.")
 	else
 		AutoVendorDB.protected[itemID] = true
-		print(PREFIX .. label .. " is protected and won't be sold.")
+		print(PREFIX .. label .. " is protected and won't be sold or suggested for deletion.")
 	end
 	-- An Alt+left-click can still pick the item up; put it back.
 	if GetCursorInfo() == "item" then ClearCursor() end
 	-- A newly protected item may have been the delete suggestion; pick again.
 	if ns.RescanBagSpace then ns.RescanBagSpace() end
-	Baganator.API.RequestItemButtonsRefresh()
+	ns.RefreshVisuals()
 end
+ns.ToggleProtected = toggleProtected
+
+-- ---------------------------------------------------------------------------
+-- Protection marker in Baganator
+-- ---------------------------------------------------------------------------
+
+local OUTLINE_COLOR = { 0.9, 0.1, 0.1, 1 }
+local OUTLINE_THICKNESS = 2
 
 -- Built once per Baganator item button. The returned frame is what Baganator
 -- shows or hides; the outline hangs off it so both appear together.
