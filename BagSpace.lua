@@ -199,6 +199,10 @@ local function announce()
 	print(line)
 end
 
+function ns.BagSpaceEnabled()
+	return AutoVendorDB == nil or AutoVendorDB.settings == nil or AutoVendorDB.settings.bagSpace ~= false
+end
+
 local function keyOf(e)
 	return e and (e.bag .. ":" .. e.slot .. ":" .. e.itemID) or nil
 end
@@ -206,7 +210,7 @@ end
 local function rescan()
 	local ranked, _, free = scan()
 	local old = keyOf(candidate)
-	candidate = (free == 0) and ranked[1] or nil
+	candidate = (free == 0 and ns.BagSpaceEnabled()) and ranked[1] or nil
 	local wasFree = freeSlots
 	freeSlots = free
 	if keyOf(candidate) ~= old then ns.RefreshVisuals() end
@@ -364,12 +368,13 @@ events:SetScript("OnEvent", function(_, event, _, message)
 	elseif event == "BAG_UPDATE_DELAYED" then
 		local wasFree = rescan()
 		-- Announce only the moment the bags fill, not on every later change.
-		if freeSlots == 0 and wasFree and wasFree > 0 and not merchantOpen() then
+		if freeSlots == 0 and wasFree and wasFree > 0 and not merchantOpen() and ns.BagSpaceEnabled() then
 			lastFullWarning = GetTime()
 			announce()
 		end
 	elseif event == "UI_ERROR_MESSAGE" then
-		if message == ERR_INV_FULL and GetTime() - lastFullWarning > FULL_ERROR_THROTTLE then
+		if message == ERR_INV_FULL and ns.BagSpaceEnabled()
+			and GetTime() - lastFullWarning > FULL_ERROR_THROTTLE then
 			lastFullWarning = GetTime()
 			announce()
 		end
@@ -382,7 +387,9 @@ SlashCmdList.AUTOVENDOR = function(msg)
 	msg = (msg or ""):match("^%s*(.-)%s*$")
 	local command, rest = msg:match("^(%S*)%s*(.-)$")
 	command = command:lower()
-	if command == "space" then
+	if command == "" or command == "settings" or command == "config" then
+		ns.ShowSettings()
+	elseif command == "space" then
 		showReport()
 	elseif command == "protect" then
 		-- Works with any bag addon: type /av protect, then Shift+click the item.
@@ -393,6 +400,7 @@ SlashCmdList.AUTOVENDOR = function(msg)
 			print(ns.PREFIX .. "Type /av protect and then Shift+click an item to protect or unprotect it.")
 		end
 	else
+		print(ns.PREFIX .. "/av - open settings.")
 		print(ns.PREFIX .. "/av space - show what to delete when your bags are full.")
 		print(ns.PREFIX .. "/av protect [item] - protect or unprotect an item (or Alt+click it in your bags).")
 	end

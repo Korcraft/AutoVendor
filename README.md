@@ -11,6 +11,12 @@ A small World of Warcraft addon (WoW Forever client).
   - the suggestion gets a yellow outline (default bags and Baganator) and a tooltip line
   - it never deletes anything itself
 
+## Settings
+
+Type `/av` (or open AutoVendor in the game's AddOns options) for on/off switches:
+sell gray items, repair gear, bags-full delete suggestions, and - if you also run
+Huntard - buying ammo at vendors.
+
 ## Commands
 
 - `/av space` (or `/autovendor space`) - show the full delete order and what's being skipped, in a copyable window.

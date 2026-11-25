@@ -69,7 +69,8 @@ local function finish(id, state)
 	C_Timer.After(REPAIR_DELAY, function()
 		if id ~= session then return end
 
-		local repaired, unpaid = repairAll()
+		local repaired, unpaid
+		if AutoVendorDB.settings.repair then repaired, unpaid = repairAll() end
 		local parts = {}
 		if state.count > 0 then
 			local noun = state.count == 1 and " item" or " items"
@@ -216,11 +217,20 @@ events:SetScript("OnEvent", function(self, event, addonName)
 		self:UnregisterEvent("ADDON_LOADED")
 		AutoVendorDB = AutoVendorDB or {}
 		AutoVendorDB.protected = AutoVendorDB.protected or {}
+		AutoVendorDB.settings = AutoVendorDB.settings or {}
+		for key, default in pairs({ sellGrays = true, repair = true, bagSpace = true }) do
+			if AutoVendorDB.settings[key] == nil then AutoVendorDB.settings[key] = default end
+		end
 		registerWithBaganator()
 		return
 	end
 	session = session + 1
 	if event == "MERCHANT_SHOW" then
-		sellPass(session, { sent = {}, count = 0, earned = 0, passes = 0 })
+		local state = { sent = {}, count = 0, earned = 0, passes = 0 }
+		if AutoVendorDB.settings.sellGrays then
+			sellPass(session, state)
+		else
+			finish(session, state)
+		end
 	end
 end)
