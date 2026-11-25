@@ -8,7 +8,7 @@ A small World of Warcraft addon (WoW Forever client).
   - never suggests protected items, profession/gathering tools (skinning knife, mining pick, fishing poles...), quest items, keys, or items with no vendor price
   - food, drink, potions, reagents and ammo are only suggested as a last resort
   - if two partial stacks can be merged, it tells you that first
-  - the suggestion gets a yellow outline (default bags and Baganator) and a tooltip line
+  - the suggestion gets a bright blue outline (default bags and Baganator) and a tooltip line
   - it never deletes anything itself
 
 ## Settings

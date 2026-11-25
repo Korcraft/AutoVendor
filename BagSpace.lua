@@ -318,7 +318,7 @@ local function showReport()
 end
 
 -- ---------------------------------------------------------------------------
--- Baganator marker on the suggested item (yellow outline)
+-- Baganator marker on the suggested item (bright blue outline)
 -- ---------------------------------------------------------------------------
 
 local function createSuggestionMarker(itemButton)
@@ -327,7 +327,7 @@ local function createSuggestionMarker(itemButton)
 	marker.padding = 0
 	local function edge()
 		local t = marker:CreateTexture(nil, "OVERLAY")
-		t:SetColorTexture(1, 0.82, 0, 1)
+		t:SetColorTexture(0.1, 0.75, 1, 1)
 		return t
 	end
 	local top, bottom, left, right = edge(), edge(), edge(), edge()
