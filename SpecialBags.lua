@@ -22,6 +22,79 @@ local function enabled()
 	return AutoVendorDB and AutoVendorDB.settings and AutoVendorDB.settings.moveToSpecialBags ~= false
 end
 
+-- ---------------------------------------------------------------------------
+-- Combining partial stacks
+-- ---------------------------------------------------------------------------
+
+local getItemInfo = (C_Item and C_Item.GetItemInfo) or _G.GetItemInfo
+
+local function mergeEnabled()
+	return AutoVendorDB and AutoVendorDB.settings and AutoVendorDB.settings.mergeStacks ~= false
+end
+
+-- Merges a stack in your normal bags into another partial stack of the same
+-- item (in any bag, so a quiver's partial stack of arrows counts too), but
+-- only when the whole stack fits -- otherwise no slot is freed. Uses an exact
+-- split so nothing is ever left on the cursor. One move per item per call;
+-- the bag update that follows calls this again if still full. Returns how
+-- many stacks it merged.
+function ns.MergeStacks()
+	if not mergeEnabled() or GetCursorInfo() then return 0 end
+
+	local byItem = {}
+	for bag = FIRST_BAG, LAST_BAG do
+		local ordinary = bag == 0 or select(2, C_Container.GetContainerNumFreeSlots(bag)) == 0
+		for slot = 1, C_Container.GetContainerNumSlots(bag) do
+			local info = C_Container.GetContainerItemInfo(bag, slot)
+			if info and info.itemID and not info.isLocked then
+				local maxStack = select(8, getItemInfo(info.itemID))
+				local count = info.stackCount or 1
+				if maxStack and maxStack > 1 and count < maxStack then
+					local list = byItem[info.itemID] or {}
+					list[#list + 1] = { bag = bag, slot = slot, count = count, room = maxStack - count,
+						ordinary = ordinary, link = info.hyperlink }
+					byItem[info.itemID] = list
+				end
+			end
+		end
+	end
+
+	local merged, names = 0, {}
+	for _, stacks in pairs(byItem) do
+		if #stacks >= 2 then
+			-- Smallest normal-bag stack goes into the stack with the most room.
+			table.sort(stacks, function(a, b) return a.count < b.count end)
+			local src
+			for _, s in ipairs(stacks) do
+				if s.ordinary then src = s; break end
+			end
+			local dest
+			for _, d in ipairs(stacks) do
+				if d ~= src and d.room >= (src and src.count or math.huge)
+					and (not dest or d.room > dest.room) then
+					dest = d
+				end
+			end
+			if src and dest then
+				C_Container.SplitContainerItem(src.bag, src.slot, src.count)
+				C_Container.PickupContainerItem(dest.bag, dest.slot)
+				if GetCursorInfo() then ClearCursor() end -- didn't take: put it back
+				merged = merged + 1
+				names[#names + 1] = src.link or "an item"
+			end
+		end
+	end
+
+	if merged > 0 then
+		print(ns.PREFIX .. "Bags full - combined stacks of " .. table.concat(names, ", ") .. ".")
+	end
+	return merged
+end
+
+-- ---------------------------------------------------------------------------
+-- Moving into special bags
+-- ---------------------------------------------------------------------------
+
 -- Free slots in each special bag, as { bag = , family = , slots = {..} }.
 local function specialBagsWithRoom()
 	local list = {}
@@ -87,4 +160,13 @@ function ns.MoveToSpecialBags()
 		print(ns.PREFIX .. "Bags full - moved " .. table.concat(names, ", ") .. " into your special bags.")
 	end
 	return moved
+end
+
+-- Called when the normal bags are full: combine stacks first, and only if
+-- that frees nothing, move things into special bags. Returns how many moves
+-- it started.
+function ns.FreeUpSpace()
+	local merged = ns.MergeStacks()
+	if merged > 0 then return merged end
+	return ns.MoveToSpecialBags()
 end

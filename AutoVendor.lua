@@ -279,7 +279,7 @@ events:SetScript("OnEvent", function(self, event, addonName)
 		AutoVendorDB.sell = AutoVendorDB.sell or {}
 		AutoVendorDB.settings = AutoVendorDB.settings or {}
 		for key, default in pairs({ sellGrays = true, sellMarked = true, repair = true, bagSpace = true,
-			moveToSpecialBags = true }) do
+			moveToSpecialBags = true, mergeStacks = true }) do
 			if AutoVendorDB.settings[key] == nil then AutoVendorDB.settings[key] = default end
 		end
 		registerWithBaganator()

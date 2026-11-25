@@ -446,9 +446,10 @@ events:SetScript("OnEvent", function(_, event, _, message)
 		rescan()
 		watchBags()
 	elseif event == "BAG_UPDATE_DELAYED" then
-		-- Bags just full? First try moving things into special bags (ammo
-		-- into the quiver, etc.); the moves trigger another bag update.
-		if ns.MoveToSpecialBags and ordinaryFreeSlots() == 0 and ns.MoveToSpecialBags() > 0 then
+		-- Bags just full? First try combining partial stacks, then moving
+		-- things into special bags (ammo into the quiver, etc.). Either one
+		-- triggers another bag update, which checks again.
+		if ordinaryFreeSlots() == 0 and ns.FreeUpSpace and ns.FreeUpSpace() > 0 then
 			return
 		end
 		local wasFree = rescan()
@@ -458,7 +459,7 @@ events:SetScript("OnEvent", function(_, event, _, message)
 			announce()
 		end
 	elseif event == "UI_ERROR_MESSAGE" then
-		if message == ERR_INV_FULL and ns.MoveToSpecialBags and ns.MoveToSpecialBags() > 0 then
+		if message == ERR_INV_FULL and ns.FreeUpSpace and ns.FreeUpSpace() > 0 then
 			return
 		end
 		if message == ERR_INV_FULL and ns.BagSpaceEnabled()
