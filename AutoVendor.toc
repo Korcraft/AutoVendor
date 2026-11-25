@@ -10,3 +10,4 @@
 AutoVendor.lua
 BagSpace.lua
 DefaultBags.lua
+Conflicts.lua
