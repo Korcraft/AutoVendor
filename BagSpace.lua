@@ -2,7 +2,9 @@
 -- deleting. It never deletes anything itself.
 --
 -- How it picks:
---   * Never suggested: items you protected with Alt+click, gathering and
+--   * Items you marked to sell (Ctrl+click) come first: you already said
+--     they're junk.
+--   * Never suggested: items you protected with Alt+right-click, gathering and
 --     profession tools (skinning knife, mining pick, fishing poles...), quest
 --     items, keys, items with no vendor price (hearthstone and the like), and
 --     anything in a profession bag, quiver or ammo pouch.
@@ -102,7 +104,7 @@ local function describe(bag, slot, info)
 	local _, _, _, _, _, _, _, maxStack, _, _, unitPrice = getItemInfo(info.hyperlink or info.itemID)
 	e.maxStack = maxStack or 1
 
-	if ns.isProtected(info.itemID) then e.skip = "protected (Alt+click)"
+	if ns.isProtected(info.itemID) then e.skip = "protected (Alt+right-click)"
 	elseif TOOLS[info.itemID] then e.skip = "tool"
 	elseif isQuestItem(bag, slot, classID) then e.skip = "quest item"
 	elseif classID == CLASS_KEY then e.skip = "key"
@@ -115,14 +117,16 @@ local function describe(bag, slot, info)
 	elseif info.hasNoValue or unitPrice <= 0 then e.skip = "no vendor price"
 	else
 		e.value = unitPrice * e.count
-		e.lastResort = KEEP_LAST[classID]
+		e.marked = ns.isMarkedToSell(info.itemID)
+		if not e.marked then e.lastResort = KEEP_LAST[classID] end
 	end
 	return e
 end
 
--- Lower sorts first: ordinary before last-resort, then cheaper, then lower
--- quality, then fewer items.
+-- Lower sorts first: marked-to-sell, then ordinary, then last-resort; within
+-- each, cheaper first, then lower quality, then fewer items.
 local function better(a, b)
+	if a.marked ~= b.marked then return a.marked end
 	if (a.lastResort ~= nil) ~= (b.lastResort ~= nil) then return a.lastResort == nil end
 	if a.value ~= b.value then return a.value < b.value end
 	if a.quality ~= b.quality then return a.quality < b.quality end
@@ -304,7 +308,8 @@ local function showReport()
 	end
 	lines[#lines + 1] = "Delete order (first = least valuable):"
 	for i, e in ipairs(ranked) do
-		local tag = e.lastResort and ("  [last resort: " .. e.lastResort .. "]") or ""
+		local tag = e.marked and "  [marked to sell]"
+			or e.lastResort and ("  [last resort: " .. e.lastResort .. "]") or ""
 		lines[#lines + 1] = string.format("%2d. %s - %s%s", i, nameOf(e), ns.formatMoney(e.value), tag)
 	end
 	if #ranked == 0 then lines[#lines + 1] = "  (nothing)" end
@@ -391,17 +396,19 @@ SlashCmdList.AUTOVENDOR = function(msg)
 		ns.ShowSettings()
 	elseif command == "space" then
 		showReport()
-	elseif command == "protect" then
-		-- Works with any bag addon: type /av protect, then Shift+click the item.
+	elseif command == "protect" or command == "sell" then
+		-- Works with any bag addon: type the command, then Shift+click the item.
 		local itemID = tonumber(rest:match("item:(%d+)") or rest)
+		local toggle = command == "protect" and ns.ToggleProtected or ns.ToggleSell
 		if itemID then
-			ns.ToggleProtected(itemID, rest:match("|c.-|r"))
+			toggle(itemID, rest:match("|c.-|r"))
 		else
-			print(ns.PREFIX .. "Type /av protect and then Shift+click an item to protect or unprotect it.")
+			print(ns.PREFIX .. "Type /av " .. command .. " and then Shift+click an item.")
 		end
 	else
 		print(ns.PREFIX .. "/av - open settings.")
 		print(ns.PREFIX .. "/av space - show what to delete when your bags are full.")
-		print(ns.PREFIX .. "/av protect [item] - protect or unprotect an item (or Alt+click it in your bags).")
+		print(ns.PREFIX .. "/av sell [item] - mark or unmark an item to sell (or Ctrl+click it in your bags).")
+		print(ns.PREFIX .. "/av protect [item] - protect or unprotect an item (or Alt+right-click it in your bags).")
 	end
 end

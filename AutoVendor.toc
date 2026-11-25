@@ -1,9 +1,9 @@
 ## Interface: 16001
 ## Interface-Camelot: 16001
 ## Title: AutoVendor
-## Notes: Sells gray items and repairs gear at vendors. When your bags fill up, tells you the least valuable item to delete. Alt+click an item in your bags to protect it.
+## Notes: Sells gray and marked items and repairs gear at vendors. Suggests what to delete when your bags are full. Ctrl+click marks an item to sell, Alt+right-click protects it.
 ## Author: Korcraft
-## Version: 0.5.1
+## Version: 0.6.0
 ## SavedVariables: AutoVendorDB
 ## OptionalDeps: Baganator
 

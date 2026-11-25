@@ -1,12 +1,15 @@
--- AutoVendor: whenever a merchant opens, sells every gray item in your bags,
--- then repairs all gear with your own gold if this merchant can repair.
--- Selling goes first so the sale money can help pay for the repair.
+-- AutoVendor: whenever a merchant opens, sells every gray item and every item
+-- you marked to sell, then repairs all gear with your own gold if this
+-- merchant can repair. Selling goes first so the sale money can help pay for
+-- the repair.
 --
--- Protected items: Alt+left-click an item in your bags (default bags or
--- Baganator) to protect it, again to unprotect; with any other bag addon use
--- /av protect [item link]. Protected items are never auto-sold or suggested
--- for deletion and get a red outline with an X, as a reminder not to sell
--- them by hand either. Protection is by item type, shared by all characters.
+-- Marking items, in your bags (default bags or Baganator):
+--   Ctrl+left-click  = mark to sell (again to unmark). Gold coin in the corner.
+--   Alt+right-click  = protect (again to unprotect). Red outline with an X;
+--                      never sold or suggested for deletion.
+-- With any other bag addon use /av sell [item] or /av protect [item].
+-- Marks are by item type and shared by all your characters. An item is never
+-- both: marking it one way clears the other.
 
 local _, ns = ...
 
@@ -46,13 +49,22 @@ local function sellPriceOf(info)
 end
 
 local function isProtected(itemID)
-	return itemID ~= nil and AutoVendorDB ~= nil and AutoVendorDB.protected[itemID] == true
+	return itemID ~= nil and AutoVendorDB ~= nil and AutoVendorDB.protected ~= nil
+		and AutoVendorDB.protected[itemID] == true
 end
 ns.isProtected = isProtected
 
-local function isSellableGray(info)
-	return info and info.quality == QUALITY_POOR and not info.hasNoValue
-		and not isProtected(info.itemID)
+local function isMarkedToSell(itemID)
+	return itemID ~= nil and AutoVendorDB ~= nil and AutoVendorDB.sell ~= nil
+		and AutoVendorDB.sell[itemID] == true
+end
+ns.isMarkedToSell = isMarkedToSell
+
+local function shouldSell(info)
+	if not info or info.hasNoValue or isProtected(info.itemID) then return false end
+	local s = AutoVendorDB.settings
+	return (s.sellGrays and info.quality == QUALITY_POOR)
+		or (s.sellMarked and isMarkedToSell(info.itemID))
 end
 
 -- Returns the repair cost paid, or nil plus the unpaid cost if short on gold.
@@ -96,7 +108,7 @@ local function sellPass(id, state)
 		for slot = 1, C_Container.GetContainerNumSlots(bag) do
 			local info = C_Container.GetContainerItemInfo(bag, slot)
 			local key = bag .. ":" .. slot
-			if isSellableGray(info) and not state.sent[key] then
+			if shouldSell(info) and not state.sent[key] then
 				if info.isLocked or soldThisPass >= SELL_BATCH then
 					moreToDo = true
 				else
@@ -129,6 +141,14 @@ function ns.RefreshVisuals()
 	if ns.RefreshDefaultBags then ns.RefreshDefaultBags() end
 end
 
+local function afterMarkChange()
+	-- A modified click can still pick the item up; put it back.
+	if GetCursorInfo() == "item" then ClearCursor() end
+	-- The change may affect which item is the delete suggestion.
+	if ns.RescanBagSpace then ns.RescanBagSpace() end
+	ns.RefreshVisuals()
+end
+
 local function toggleProtected(itemID, itemLink)
 	if not AutoVendorDB then return end
 	local label = itemLink or ("item " .. itemID)
@@ -137,15 +157,42 @@ local function toggleProtected(itemID, itemLink)
 		print(PREFIX .. label .. " is no longer protected.")
 	else
 		AutoVendorDB.protected[itemID] = true
+		AutoVendorDB.sell[itemID] = nil
 		print(PREFIX .. label .. " is protected and won't be sold or suggested for deletion.")
 	end
-	-- An Alt+left-click can still pick the item up; put it back.
-	if GetCursorInfo() == "item" then ClearCursor() end
-	-- A newly protected item may have been the delete suggestion; pick again.
-	if ns.RescanBagSpace then ns.RescanBagSpace() end
-	ns.RefreshVisuals()
+	afterMarkChange()
 end
 ns.ToggleProtected = toggleProtected
+
+local function toggleSell(itemID, itemLink)
+	if not AutoVendorDB then return end
+	local label = itemLink or ("item " .. itemID)
+	if isMarkedToSell(itemID) then
+		AutoVendorDB.sell[itemID] = nil
+		print(PREFIX .. label .. " is no longer marked to sell.")
+	else
+		AutoVendorDB.sell[itemID] = true
+		AutoVendorDB.protected[itemID] = nil
+		print(PREFIX .. label .. " is marked to sell. It will be sold at the next vendor.")
+	end
+	afterMarkChange()
+end
+ns.ToggleSell = toggleSell
+
+-- The one place that decides what a modified click on a bag item means, so
+-- every bag UI behaves the same. Returns true if the click was ours.
+function ns.HandleItemClick(mouseButton, itemID, itemLink)
+	if not itemID then return false end
+	local alt, ctrl, shift = IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
+	if mouseButton == "LeftButton" and ctrl and not alt and not shift then
+		toggleSell(itemID, itemLink)
+		return true
+	elseif mouseButton == "RightButton" and alt and not ctrl and not shift then
+		toggleProtected(itemID, itemLink)
+		return true
+	end
+	return false
+end
 
 -- ---------------------------------------------------------------------------
 -- Protection marker in Baganator
@@ -184,25 +231,37 @@ local function createMarker(itemButton)
 	right:SetPoint("BOTTOMRIGHT", itemButton, "BOTTOMRIGHT")
 	right:SetWidth(OUTLINE_THICKNESS)
 
-	-- Baganator's own Alt+click (highlight matching items) also runs; harmless.
+	-- Ctrl+click marks to sell, Alt+right-click protects (ns.HandleItemClick).
+	-- Hooked here because this runs once per Baganator item button.
 	itemButton:HookScript("OnClick", function(self, mouseButton)
-		if mouseButton ~= "LeftButton" or not IsAltKeyDown()
-			or IsShiftKeyDown() or IsControlKeyDown() then
-			return
-		end
 		local details = self.BGR
-		if details and details.itemID then toggleProtected(details.itemID, details.itemLink) end
+		if details then ns.HandleItemClick(mouseButton, details.itemID, details.itemLink) end
 	end)
 
+	return marker
+end
+
+-- Gold coin in the corner of items marked to sell.
+local function createSellMarker(itemButton)
+	local marker = CreateFrame("Frame", nil, itemButton)
+	marker:SetSize(14, 14)
+	marker.padding = 0
+	local coin = marker:CreateTexture(nil, "OVERLAY")
+	coin:SetAllPoints()
+	coin:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
 	return marker
 end
 
 local function registerWithBaganator()
 	if not (Baganator and Baganator.API and Baganator.API.RegisterCornerWidget) then return end
 	-- First in the top-left corner, so it wins over e.g. the junk coin there.
+	-- An item is never both protected and marked, so they can share the corner.
 	Baganator.API.RegisterCornerWidget("AutoVendor: protected", "autovendor_protected",
 		function(_, details) return isProtected(details.itemID) end,
 		createMarker, { corner = "top_left", priority = 1 }, true)
+	Baganator.API.RegisterCornerWidget("AutoVendor: marked to sell", "autovendor_sell",
+		function(_, details) return isMarkedToSell(details.itemID) end,
+		createSellMarker, { corner = "top_left", priority = 2 }, true)
 end
 
 -- ---------------------------------------------------------------------------
@@ -217,8 +276,9 @@ events:SetScript("OnEvent", function(self, event, addonName)
 		self:UnregisterEvent("ADDON_LOADED")
 		AutoVendorDB = AutoVendorDB or {}
 		AutoVendorDB.protected = AutoVendorDB.protected or {}
+		AutoVendorDB.sell = AutoVendorDB.sell or {}
 		AutoVendorDB.settings = AutoVendorDB.settings or {}
-		for key, default in pairs({ sellGrays = true, repair = true, bagSpace = true }) do
+		for key, default in pairs({ sellGrays = true, sellMarked = true, repair = true, bagSpace = true }) do
 			if AutoVendorDB.settings[key] == nil then AutoVendorDB.settings[key] = default end
 		end
 		registerWithBaganator()
@@ -226,11 +286,7 @@ events:SetScript("OnEvent", function(self, event, addonName)
 	end
 	session = session + 1
 	if event == "MERCHANT_SHOW" then
-		local state = { sent = {}, count = 0, earned = 0, passes = 0 }
-		if AutoVendorDB.settings.sellGrays then
-			sellPass(session, state)
-		else
-			finish(session, state)
-		end
+		-- shouldSell() checks the sell settings, so with both off nothing sells.
+		sellPass(session, { sent = {}, count = 0, earned = 0, passes = 0 })
 	end
 end)

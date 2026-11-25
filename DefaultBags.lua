@@ -1,13 +1,15 @@
--- DefaultBags: the same markers and Alt+click protection as in Baganator, but
--- for the game's own bag windows, plus tooltip lines that show up in any bag
--- UI that uses the standard bag tooltip.
---   red outline + X   = protected (never sold or suggested for deletion)
---   hot pink outline    = suggested to delete while your bags are full
+-- DefaultBags: the same markers and clicks as in Baganator, but for the
+-- game's own bag windows, plus tooltip lines that show up in any bag UI that
+-- uses the standard bag tooltip.
+--   red outline + X   = protected (Alt+right-click)
+--   gold coin         = marked to sell (Ctrl+left-click)
+--   hot pink outline  = suggested to delete while your bags are full
 
 local _, ns = ...
 
 local THICKNESS = 2
 local RED = { 0.9, 0.1, 0.1 }
+local GOLD = { 1, 0.82, 0 }
 local PINK = { 1, 0.2, 0.6 } -- no item quality or quest border uses pink
 
 -- ---------------------------------------------------------------------------
@@ -76,17 +78,14 @@ local function showAll(textures, shown)
 end
 
 local function onClick(self, mouseButton)
-	if mouseButton ~= "LeftButton" or not IsAltKeyDown()
-		or IsShiftKeyDown() or IsControlKeyDown() then
-		return
-	end
+	if not (IsAltKeyDown() or IsControlKeyDown()) then return end
 	local bag, slot = slotOf(self)
 	if not bag then return end
 	local info = C_Container.GetContainerItemInfo(bag, slot)
-	if info and info.itemID then ns.ToggleProtected(info.itemID, info.hyperlink) end
+	if info then ns.HandleItemClick(mouseButton, info.itemID, info.hyperlink) end
 end
 
--- Built the first time we see a button: markers plus the Alt+click hook.
+-- Built the first time we see a button: markers plus the click hook.
 local function setUp(button)
 	local m = {}
 	m.protectOutline = makeOutline(button, RED)
@@ -96,6 +95,12 @@ local function setUp(button)
 	x:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
 	x:Hide()
 	m.protectX = x
+	local coin = button:CreateTexture(nil, "OVERLAY", nil, 7)
+	coin:SetSize(14, 14)
+	coin:SetPoint("TOPLEFT", 1, -1)
+	coin:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
+	coin:Hide()
+	m.sellCoin = coin
 	m.suggestOutline = makeOutline(button, PINK)
 	button.AutoVendorMarkers = m
 	button:HookScript("OnClick", onClick)
@@ -104,18 +109,20 @@ end
 
 local function updateButton(button)
 	local m = button.AutoVendorMarkers or setUp(button)
-	local protected, suggested = false, false
+	local protected, marked, suggested = false, false, false
 	if button:IsShown() then
 		local bag, slot = slotOf(button)
 		local info = bag and C_Container.GetContainerItemInfo(bag, slot)
 		if info and info.itemID then
 			protected = ns.isProtected(info.itemID)
+			marked = ns.isMarkedToSell(info.itemID)
 			local s = ns.GetDeleteSuggestion and ns.GetDeleteSuggestion()
 			suggested = s ~= nil and s.bag == bag and s.slot == slot
 		end
 	end
 	showAll(m.protectOutline, protected)
 	if protected then m.protectX:Show() else m.protectX:Hide() end
+	if marked then m.sellCoin:Show() else m.sellCoin:Hide() end
 	showAll(m.suggestOutline, suggested)
 end
 
@@ -147,6 +154,9 @@ local function addTooltipLines(tooltip, bag, slot)
 	local added = false
 	if ns.isProtected(info.itemID) then
 		tooltip:AddLine("AutoVendor: protected", RED[1], RED[2], RED[3])
+		added = true
+	elseif ns.isMarkedToSell(info.itemID) then
+		tooltip:AddLine("AutoVendor: marked to sell", GOLD[1], GOLD[2], GOLD[3])
 		added = true
 	end
 	local s = ns.GetDeleteSuggestion and ns.GetDeleteSuggestion()
