@@ -2,13 +2,13 @@
 -- for the game's own bag windows, plus tooltip lines that show up in any bag
 -- UI that uses the standard bag tooltip.
 --   red outline + X   = protected (never sold or suggested for deletion)
---   purple outline      = suggested to delete while your bags are full
+--   hot pink outline    = suggested to delete while your bags are full
 
 local _, ns = ...
 
 local THICKNESS = 2
 local RED = { 0.9, 0.1, 0.1 }
-local PURPLE = { 0.8, 0.3, 1 }
+local PINK = { 1, 0.2, 0.6 } -- no item quality or quest border uses pink
 
 -- ---------------------------------------------------------------------------
 -- Finding the default bag buttons
@@ -96,7 +96,7 @@ local function setUp(button)
 	x:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
 	x:Hide()
 	m.protectX = x
-	m.suggestOutline = makeOutline(button, PURPLE)
+	m.suggestOutline = makeOutline(button, PINK)
 	button.AutoVendorMarkers = m
 	button:HookScript("OnClick", onClick)
 	return m
@@ -151,7 +151,7 @@ local function addTooltipLines(tooltip, bag, slot)
 	end
 	local s = ns.GetDeleteSuggestion and ns.GetDeleteSuggestion()
 	if s and s.bag == bag and s.slot == slot then
-		tooltip:AddLine("AutoVendor: least valuable item - suggested to delete", PURPLE[1], PURPLE[2], PURPLE[3])
+		tooltip:AddLine("AutoVendor: least valuable item - suggested to delete", PINK[1], PINK[2], PINK[3])
 		added = true
 	end
 	if added then tooltip:Show() end
