@@ -36,6 +36,12 @@ local OPTIONS = {
 	{ label = "Suggest what to delete when bags are full", option = setting("bagSpace"),
 		help = "Names the least valuable item when your bags fill up, and outlines it in pink. Never deletes anything.",
 		after = function() if ns.RescanBagSpace then ns.RescanBagSpace() end end },
+	{ label = "Buy back protected items sold by mistake", option = setting("guardSales"),
+		help = "If you sell a protected item to a vendor by hand, it's bought straight back. "
+			.. "Unprotect it first (Alt+right-click) to sell it on purpose." },
+	{ label = "Take protected items out of trades", option = setting("guardTrades"),
+		help = "If you put a protected item in the trade window, it's taken straight back out. "
+			.. "Unprotect it first (Alt+right-click) to trade it on purpose." },
 	{ label = "Combine partial stacks when bags are full", option = setting("mergeStacks"),
 		help = "When your normal bags fill up, merges partial stacks of the same item (including into a "
 			.. "partial stack in your quiver or a profession bag) when that frees a slot." },

@@ -375,6 +375,8 @@ local function nameOf(e)
 	return name
 end
 
+ns.ShowCopyableText = showCopyableText
+
 local function showReport()
 	local ranked, skipped, free, mergeable = scan()
 	local lines = { "Free slots in ordinary bags: " .. free, "" }
@@ -493,6 +495,8 @@ SlashCmdList.AUTOVENDOR = function(msg)
 	command = command:lower()
 	if command == "" or command == "settings" or command == "config" then
 		ns.ShowSettings()
+	elseif command == "guardtest" then
+		ns.GuardTest()
 	elseif command == "space" then
 		showReport()
 	elseif command == "protect" or command == "sell" then
