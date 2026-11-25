@@ -7,7 +7,6 @@
 
 local _, ns = ...
 
-local THICKNESS = 2
 local RED = { 0.9, 0.1, 0.1 }
 local GOLD = { 1, 0.82, 0 }
 local PINK = { 1, 0.2, 0.6 } -- no item quality or quest border uses pink
@@ -55,26 +54,8 @@ end
 -- Markers
 -- ---------------------------------------------------------------------------
 
-local function makeOutline(button, color)
-	local edges = {}
-	for i = 1, 4 do
-		local t = button:CreateTexture(nil, "OVERLAY", nil, 7)
-		t:SetColorTexture(color[1], color[2], color[3], 1)
-		t:Hide()
-		edges[i] = t
-	end
-	local top, bottom, left, right = edges[1], edges[2], edges[3], edges[4]
-	top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(THICKNESS)
-	bottom:SetPoint("BOTTOMLEFT"); bottom:SetPoint("BOTTOMRIGHT"); bottom:SetHeight(THICKNESS)
-	left:SetPoint("TOPLEFT"); left:SetPoint("BOTTOMLEFT"); left:SetWidth(THICKNESS)
-	right:SetPoint("TOPRIGHT"); right:SetPoint("BOTTOMRIGHT"); right:SetWidth(THICKNESS)
-	return edges
-end
-
-local function showAll(textures, shown)
-	for _, t in ipairs(textures) do
-		if shown then t:Show() else t:Hide() end
-	end
+local function setShown(frame, shown)
+	if shown then frame:Show() else frame:Hide() end
 end
 
 local function onClick(self, mouseButton)
@@ -85,23 +66,31 @@ local function onClick(self, mouseButton)
 	if info then ns.HandleItemClick(mouseButton, info.itemID, info.hyperlink) end
 end
 
--- Built the first time we see a button: markers plus the click hook.
+-- Built the first time we see a button: markers (dotted, pulsing glow -- see
+-- Markers.lua) plus the click hook.
 local function setUp(button)
 	local m = {}
-	m.protectOutline = makeOutline(button, RED)
-	local x = button:CreateTexture(nil, "OVERLAY", nil, 7)
+
+	m.protect = ns.CreateOutline(button, button, RED)
+	local x = m.protect:CreateTexture(nil, "OVERLAY", nil, 7)
 	x:SetSize(16, 16)
 	x:SetPoint("TOPLEFT")
 	x:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
-	x:Hide()
-	m.protectX = x
-	local coin = button:CreateTexture(nil, "OVERLAY", nil, 7)
-	coin:SetSize(14, 14)
-	coin:SetPoint("TOPLEFT", 1, -1)
+	m.protect:Hide()
+
+	m.sell = CreateFrame("Frame", nil, button)
+	m.sell:SetSize(14, 14)
+	m.sell:SetPoint("TOPLEFT", 1, -1)
+	m.sell:SetFrameLevel(button:GetFrameLevel() + 2)
+	local coin = m.sell:CreateTexture(nil, "OVERLAY", nil, 7)
+	coin:SetAllPoints()
 	coin:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
-	coin:Hide()
-	m.sellCoin = coin
-	m.suggestOutline = makeOutline(button, PINK)
+	ns.AddPulse(m.sell)
+	m.sell:Hide()
+
+	m.suggest = ns.CreateOutline(button, button, PINK)
+	m.suggest:Hide()
+
 	button.AutoVendorMarkers = m
 	button:HookScript("OnClick", onClick)
 	return m
@@ -120,10 +109,9 @@ local function updateButton(button)
 			suggested = s ~= nil and s.bag == bag and s.slot == slot
 		end
 	end
-	showAll(m.protectOutline, protected)
-	if protected then m.protectX:Show() else m.protectX:Hide() end
-	if marked then m.sellCoin:Show() else m.sellCoin:Hide() end
-	showAll(m.suggestOutline, suggested)
+	setShown(m.protect, protected)
+	setShown(m.sell, marked)
+	setShown(m.suggest, suggested)
 end
 
 function ns.RefreshDefaultBags()

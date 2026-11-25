@@ -198,11 +198,11 @@ end
 -- Protection marker in Baganator
 -- ---------------------------------------------------------------------------
 
-local OUTLINE_COLOR = { 0.9, 0.1, 0.1, 1 }
-local OUTLINE_THICKNESS = 2
+local OUTLINE_COLOR = { 0.9, 0.1, 0.1 }
 
 -- Built once per Baganator item button. The returned frame is what Baganator
--- shows or hides; the outline hangs off it so both appear together.
+-- shows or hides; the dotted, pulsing outline (Markers.lua) hangs off it so
+-- both appear together.
 local function createMarker(itemButton)
 	local marker = CreateFrame("Frame", nil, itemButton)
 	marker:SetSize(16, 16)
@@ -212,24 +212,7 @@ local function createMarker(itemButton)
 	x:SetAllPoints()
 	x:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
 
-	local function edge()
-		local t = marker:CreateTexture(nil, "OVERLAY")
-		t:SetColorTexture(OUTLINE_COLOR[1], OUTLINE_COLOR[2], OUTLINE_COLOR[3], OUTLINE_COLOR[4])
-		return t
-	end
-	local top, bottom, left, right = edge(), edge(), edge(), edge()
-	top:SetPoint("TOPLEFT", itemButton, "TOPLEFT")
-	top:SetPoint("TOPRIGHT", itemButton, "TOPRIGHT")
-	top:SetHeight(OUTLINE_THICKNESS)
-	bottom:SetPoint("BOTTOMLEFT", itemButton, "BOTTOMLEFT")
-	bottom:SetPoint("BOTTOMRIGHT", itemButton, "BOTTOMRIGHT")
-	bottom:SetHeight(OUTLINE_THICKNESS)
-	left:SetPoint("TOPLEFT", itemButton, "TOPLEFT")
-	left:SetPoint("BOTTOMLEFT", itemButton, "BOTTOMLEFT")
-	left:SetWidth(OUTLINE_THICKNESS)
-	right:SetPoint("TOPRIGHT", itemButton, "TOPRIGHT")
-	right:SetPoint("BOTTOMRIGHT", itemButton, "BOTTOMRIGHT")
-	right:SetWidth(OUTLINE_THICKNESS)
+	ns.CreateOutline(marker, itemButton, OUTLINE_COLOR)
 
 	-- Alt+left-click marks to sell, Alt+right-click protects (ns.HandleItemClick).
 	-- Hooked here because this runs once per Baganator item button.
@@ -249,6 +232,7 @@ local function createSellMarker(itemButton)
 	local coin = marker:CreateTexture(nil, "OVERLAY")
 	coin:SetAllPoints()
 	coin:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
+	ns.AddPulse(marker)
 	return marker
 end
 

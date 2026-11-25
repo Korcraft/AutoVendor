@@ -401,31 +401,14 @@ local function showReport()
 end
 
 -- ---------------------------------------------------------------------------
--- Baganator marker on the suggested item (hot pink outline)
+-- Baganator marker on the suggested item (hot pink, dotted, pulsing glow)
 -- ---------------------------------------------------------------------------
 
 local function createSuggestionMarker(itemButton)
 	local marker = CreateFrame("Frame", nil, itemButton)
 	marker:SetSize(1, 1)
 	marker.padding = 0
-	local function edge()
-		local t = marker:CreateTexture(nil, "OVERLAY")
-		t:SetColorTexture(1, 0.2, 0.6, 1)
-		return t
-	end
-	local top, bottom, left, right = edge(), edge(), edge(), edge()
-	top:SetPoint("TOPLEFT", itemButton, "TOPLEFT")
-	top:SetPoint("TOPRIGHT", itemButton, "TOPRIGHT")
-	top:SetHeight(2)
-	bottom:SetPoint("BOTTOMLEFT", itemButton, "BOTTOMLEFT")
-	bottom:SetPoint("BOTTOMRIGHT", itemButton, "BOTTOMRIGHT")
-	bottom:SetHeight(2)
-	left:SetPoint("TOPLEFT", itemButton, "TOPLEFT")
-	left:SetPoint("BOTTOMLEFT", itemButton, "BOTTOMLEFT")
-	left:SetWidth(2)
-	right:SetPoint("TOPRIGHT", itemButton, "TOPRIGHT")
-	right:SetPoint("BOTTOMRIGHT", itemButton, "BOTTOMRIGHT")
-	right:SetWidth(2)
+	ns.CreateOutline(marker, itemButton, { 1, 0.2, 0.6 })
 	return marker
 end
 
