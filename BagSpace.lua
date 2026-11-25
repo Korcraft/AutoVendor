@@ -87,6 +87,8 @@ local function isOrdinaryBag(bag)
 	return family == 0
 end
 
+local lastOrdinaryFree -- free normal slots at the last bag update (nil before the first)
+
 local function ordinaryFreeSlots()
 	local free = 0
 	for bag = FIRST_BAG, LAST_BAG do
@@ -436,6 +438,18 @@ end
 
 -- ---------------------------------------------------------------------------
 
+-- Called by SpecialBags.lua when tidying is finished. If the bags are still
+-- full after combining and moving everything it could, now it's time to
+-- suggest a delete.
+function ns.OnTidyDone()
+	lastOrdinaryFree = ordinaryFreeSlots()
+	rescan()
+	if freeSlots == 0 and not merchantOpen() and ns.BagSpaceEnabled() then
+		lastFullWarning = GetTime()
+		announce()
+	end
+end
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
 events:RegisterEvent("BAG_UPDATE_DELAYED")
@@ -446,26 +460,27 @@ events:SetScript("OnEvent", function(_, event, _, message)
 		rescan()
 		watchBags()
 	elseif event == "BAG_UPDATE_DELAYED" then
-		-- Bags just full? First try combining partial stacks, then moving
-		-- things into special bags (ammo into the quiver, etc.). Either one
-		-- triggers another bag update, which checks again.
-		if ordinaryFreeSlots() == 0 and ns.FreeUpSpace and ns.FreeUpSpace() > 0 then
+		-- While tidying (SpecialBags.lua), each bag update runs its next pass;
+		-- everything else waits until it's finished (ns.OnTidyDone below).
+		if ns.IsTidying and ns.IsTidying() then
+			ns.TidyStep()
 			return
 		end
-		local wasFree = rescan()
-		-- Announce only the moment the bags fill, not on every later change.
-		if freeSlots == 0 and wasFree and wasFree > 0 and not merchantOpen() and ns.BagSpaceEnabled() then
-			lastFullWarning = GetTime()
-			announce()
+		-- The moment the normal bags fill up: tidy first (combine stacks, move
+		-- things into special bags) and only then decide about deleting.
+		local free = ordinaryFreeSlots()
+		if free == 0 and lastOrdinaryFree ~= 0 and ns.StartTidy then
+			lastOrdinaryFree = 0
+			ns.StartTidy()
+			return
 		end
+		lastOrdinaryFree = free
+		rescan()
 	elseif event == "UI_ERROR_MESSAGE" then
-		if message == ERR_INV_FULL and ns.FreeUpSpace and ns.FreeUpSpace() > 0 then
-			return
-		end
-		if message == ERR_INV_FULL and ns.BagSpaceEnabled()
+		if message == ERR_INV_FULL and ns.StartTidy and not ns.IsTidying()
 			and GetTime() - lastFullWarning > FULL_ERROR_THROTTLE then
 			lastFullWarning = GetTime()
-			announce()
+			ns.StartTidy()
 		end
 	end
 end)
