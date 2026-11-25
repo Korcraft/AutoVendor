@@ -4,7 +4,7 @@
 -- the repair.
 --
 -- Marking items, in your bags (default bags or Baganator):
---   Ctrl+left-click  = mark to sell (again to unmark). Gold coin in the corner.
+--   Alt+left-click   = mark to sell (again to unmark). Gold coin in the corner.
 --   Alt+right-click  = protect (again to unprotect). Red outline with an X;
 --                      never sold or suggested for deletion.
 -- With any other bag addon use /av sell [item] or /av protect [item].
@@ -184,7 +184,7 @@ ns.ToggleSell = toggleSell
 function ns.HandleItemClick(mouseButton, itemID, itemLink)
 	if not itemID then return false end
 	local alt, ctrl, shift = IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
-	if mouseButton == "LeftButton" and ctrl and not alt and not shift then
+	if mouseButton == "LeftButton" and alt and not ctrl and not shift then
 		toggleSell(itemID, itemLink)
 		return true
 	elseif mouseButton == "RightButton" and alt and not ctrl and not shift then
@@ -231,7 +231,7 @@ local function createMarker(itemButton)
 	right:SetPoint("BOTTOMRIGHT", itemButton, "BOTTOMRIGHT")
 	right:SetWidth(OUTLINE_THICKNESS)
 
-	-- Ctrl+click marks to sell, Alt+right-click protects (ns.HandleItemClick).
+	-- Alt+left-click marks to sell, Alt+right-click protects (ns.HandleItemClick).
 	-- Hooked here because this runs once per Baganator item button.
 	itemButton:HookScript("OnClick", function(self, mouseButton)
 		local details = self.BGR

@@ -3,7 +3,7 @@
 A small World of Warcraft addon (WoW Forever client).
 
 - **Sells gray items** (and items you marked) automatically whenever you open a vendor, then **repairs** your gear with your own gold.
-- **Mark items to sell:** Ctrl+click an item in your bags (again to unmark). It gets a gold coin and is sold along with the grays at the next vendor.
+- **Mark items to sell:** Alt+left-click an item in your bags (again to unmark). It gets a gold coin and is sold along with the grays at the next vendor.
 - **Protect items:** Alt+right-click an item in your bags (again to unprotect). Protected items are never sold or suggested for deletion, get a red outline, and say so in their tooltip.
 - Both work in the default bags and in [Baganator](https://www.curseforge.com/wow/addons/baganator); with any other bag addon type `/av sell` or `/av protect` and Shift+click the item. Marks are per item type and shared by all your characters.
 - **Bags full?** AutoVendor tells you the least valuable item to delete:

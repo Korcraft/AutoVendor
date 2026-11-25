@@ -2,7 +2,7 @@
 -- deleting. It never deletes anything itself.
 --
 -- How it picks:
---   * Items you marked to sell (Ctrl+click) come first: you already said
+--   * Items you marked to sell (Alt+left-click) come first: you already said
 --     they're junk.
 --   * Never suggested: items you protected with Alt+right-click, gathering and
 --     profession tools (skinning knife, mining pick, fishing poles...), quest
@@ -408,7 +408,7 @@ SlashCmdList.AUTOVENDOR = function(msg)
 	else
 		print(ns.PREFIX .. "/av - open settings.")
 		print(ns.PREFIX .. "/av space - show what to delete when your bags are full.")
-		print(ns.PREFIX .. "/av sell [item] - mark or unmark an item to sell (or Ctrl+click it in your bags).")
+		print(ns.PREFIX .. "/av sell [item] - mark or unmark an item to sell (or Alt+left-click it in your bags).")
 		print(ns.PREFIX .. "/av protect [item] - protect or unprotect an item (or Alt+right-click it in your bags).")
 	end
 end

@@ -2,7 +2,7 @@
 -- game's own bag windows, plus tooltip lines that show up in any bag UI that
 -- uses the standard bag tooltip.
 --   red outline + X   = protected (Alt+right-click)
---   gold coin         = marked to sell (Ctrl+left-click)
+--   gold coin         = marked to sell (Alt+left-click)
 --   hot pink outline  = suggested to delete while your bags are full
 
 local _, ns = ...
@@ -78,7 +78,7 @@ local function showAll(textures, shown)
 end
 
 local function onClick(self, mouseButton)
-	if not (IsAltKeyDown() or IsControlKeyDown()) then return end
+	if not IsAltKeyDown() then return end
 	local bag, slot = slotOf(self)
 	if not bag then return end
 	local info = C_Container.GetContainerItemInfo(bag, slot)

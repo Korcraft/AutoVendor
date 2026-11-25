@@ -27,8 +27,8 @@ end
 local OPTIONS = {
 	{ label = "Sell gray items at vendors", option = setting("sellGrays"),
 		help = "Sells every gray item when you open a vendor. Protected items (Alt+right-click) are never sold." },
-	{ label = "Sell items I marked (Ctrl+click)", option = setting("sellMarked"),
-		help = "Ctrl+click an item in your bags to mark it to sell (gold coin). Marked items are sold "
+	{ label = "Sell items I marked (Alt+left-click)", option = setting("sellMarked"),
+		help = "Alt+left-click an item in your bags to mark it to sell (gold coin). Marked items are sold "
 			.. "along with the grays when you open a vendor." },
 	{ label = "Repair gear at vendors", option = setting("repair"),
 		help = "Repairs all your gear with your own gold (never guild funds) when the vendor can repair." },
