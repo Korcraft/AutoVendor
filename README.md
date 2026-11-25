@@ -5,7 +5,7 @@ A small World of Warcraft addon (WoW Forever client).
 - **Sells gray items** (and items you marked) automatically whenever you open a vendor, then **repairs** your gear with your own gold.
 - **Mark items to sell:** Alt+left-click an item in your bags (again to unmark). It gets a gold coin and is sold along with the grays at the next vendor.
 - **Protect items:** Alt+right-click an item in your bags (again to unprotect). Protected items are never sold or suggested for deletion, get a red outline, and say so in their tooltip.
-  - Sell one to a vendor by hand anyway and it's bought straight back; put one in a trade window and it's taken straight back out. (The game doesn't let addons block a sale or trade, so this is an instant undo.)
+  - Sell one to a vendor by hand anyway and it's bought straight back; put one in a trade window and it's taken straight back out - with a raid-warning-style popup and sound (only you see it). (The game doesn't let addons block a sale or trade, so this is an instant undo.)
 - Both work in the default bags and in [Baganator](https://www.curseforge.com/wow/addons/baganator); with any other bag addon type `/av sell` or `/av protect` and Shift+click the item. Marks are per item type and shared by all your characters.
 - **Combine stacks:** when your normal bags fill up, partial stacks of the same item are merged first (including into a partial stack in your quiver or a profession bag), if that frees a slot.
 - **Special bags:** when your normal bags fill up, items that belong in a special bag (ammo in a quiver or ammo pouch, leather in a leatherworking bag, herbs in an herb bag...) are moved there automatically if it has a free slot.

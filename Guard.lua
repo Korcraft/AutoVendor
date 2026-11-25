@@ -20,6 +20,19 @@ local function itemIDFromLink(link)
 	return link and tonumber(link:match("item:(%d+)"))
 end
 
+-- A raid-warning-style message in the middle of your screen, with the raid
+-- warning sound. Local only: nothing is sent to your group.
+local function warn(text)
+	if RaidNotice_AddMessage and RaidWarningFrame then
+		local color = (ChatTypeInfo and ChatTypeInfo["RAID_WARNING"]) or { r = 1, g = 0.28, b = 0 }
+		RaidNotice_AddMessage(RaidWarningFrame, text, color)
+	end
+	if PlaySound then
+		local kit = SOUNDKIT and SOUNDKIT.RAID_WARNING
+		pcall(PlaySound, kit or 8959)
+	end
+end
+
 -- ---------------------------------------------------------------------------
 -- Vendor buyback
 -- ---------------------------------------------------------------------------
@@ -51,6 +64,7 @@ local function checkBuyback()
 			local isNew = seen[link] > (known[link] or 0)
 			if isNew and ns.isProtected(itemIDFromLink(link)) then
 				BuybackItem(i)
+				warn("PROTECTED ITEM SOLD - " .. link .. " bought back")
 				print(ns.PREFIX .. link .. " is protected - bought it back. "
 					.. "Alt+right-click it to unprotect if you meant to sell it.")
 				-- One per update: indexes shift; the next MERCHANT_UPDATE continues.
@@ -75,6 +89,7 @@ local function checkTradeSlot(slot)
 	if GetCursorInfo() then return end -- don't drop something you're holding
 	ClickTradeButton(slot)            -- picks it back up out of the trade slot...
 	if GetCursorInfo() then ClearCursor() end -- ...and returns it to its bag slot
+	warn("PROTECTED ITEM - " .. link .. " taken out of the trade")
 	print(ns.PREFIX .. link .. " is protected - took it out of the trade. "
 		.. "Alt+right-click it to unprotect if you meant to trade it.")
 end
@@ -98,6 +113,11 @@ function ns.GuardTest()
 		"  " .. has("GetTradePlayerItemLink", GetTradePlayerItemLink),
 		"  " .. has("ClickTradeButton", ClickTradeButton),
 		"",
+		"Warning popup:",
+		"  " .. has("RaidNotice_AddMessage", RaidNotice_AddMessage),
+		"  " .. has("RaidWarningFrame", RaidWarningFrame),
+		"  " .. has("SOUNDKIT.RAID_WARNING", SOUNDKIT and SOUNDKIT.RAID_WARNING),
+		"",
 		"Vendor window open: " .. tostring(merchantOpen),
 	}
 	if merchantOpen and GetNumBuybackItems and GetBuybackItemLink then
@@ -114,6 +134,7 @@ function ns.GuardTest()
 		lines[#lines + 1] = "(Open a vendor and run this again to see the buyback list.)"
 	end
 	ns.ShowCopyableText("AutoVendor: guard test", table.concat(lines, "\n"))
+	warn("AutoVendor guard test - this is what the warning looks like")
 end
 
 -- ---------------------------------------------------------------------------
