@@ -12,9 +12,10 @@ local ROW_SPACING = 30
 local WIDTH = 340
 
 -- Huntard owns ammo buying; this switch just flips Huntard's own setting.
+-- Only on a hunter: Huntard switches itself off on other classes.
 local function huntardAmmo()
 	local H = _G.Huntard
-	return H and H.db and H.db.ammoRestock
+	return H and H.active and H.db and H.db.ammoRestock
 end
 
 local function setting(key)
