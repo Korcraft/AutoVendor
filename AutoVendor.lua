@@ -201,7 +201,7 @@ end
 local OUTLINE_COLOR = { 0.9, 0.1, 0.1 }
 
 -- Built once per Baganator item button. The returned frame is what Baganator
--- shows or hides; the dotted, pulsing outline (Markers.lua) hangs off it so
+-- shows or hides; the dotted outline (Markers.lua) hangs off it so
 -- both appear together.
 local function createMarker(itemButton)
 	local marker = CreateFrame("Frame", nil, itemButton)
@@ -232,7 +232,6 @@ local function createSellMarker(itemButton)
 	local coin = marker:CreateTexture(nil, "OVERLAY")
 	coin:SetAllPoints()
 	coin:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
-	ns.AddPulse(marker)
 	return marker
 end
 

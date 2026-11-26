@@ -401,7 +401,7 @@ local function showReport()
 end
 
 -- ---------------------------------------------------------------------------
--- Baganator marker on the suggested item (hot pink, dotted, pulsing glow)
+-- Baganator marker on the suggested item (hot pink, dotted, with a glow)
 -- ---------------------------------------------------------------------------
 
 local function createSuggestionMarker(itemButton)

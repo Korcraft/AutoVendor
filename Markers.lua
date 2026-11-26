@@ -1,27 +1,11 @@
 -- Markers: the look shared by every AutoVendor marker on a bag slot -- a
--- dotted outline plus a soft glow, both slowly pulsing. Used by the default
--- bags (DefaultBags.lua) and Baganator (AutoVendor.lua, BagSpace.lua).
+-- dotted outline plus a soft, steady glow. Used by the default bags
+-- (DefaultBags.lua) and Baganator (AutoVendor.lua, BagSpace.lua).
 
 local _, ns = ...
 
 local DASH, GAP, THICKNESS = 4, 3, 2
 local GLOW_SCALE = 1.75 -- the glow texture's bright ring sits well inside its edges
-local PULSE_LOW, PULSE_TIME = 0.35, 0.8
-
--- Fades `frame` between full and PULSE_LOW alpha, forever, while it's shown.
-function ns.AddPulse(frame)
-	local group = frame:CreateAnimationGroup()
-	group:SetLooping("BOUNCE")
-	local fade = group:CreateAnimation("Alpha")
-	fade:SetFromAlpha(1)
-	fade:SetToAlpha(PULSE_LOW)
-	fade:SetDuration(PULSE_TIME)
-	fade:SetSmoothing("IN_OUT")
-	frame:HookScript("OnShow", function() group:Play() end)
-	frame:HookScript("OnHide", function() group:Stop() end)
-	if frame:IsVisible() then group:Play() end
-	return group
-end
 
 -- Lays dashes along one edge of `box`, reusing textures from `pool`.
 local function layoutEdge(box, pool, used, color, horizontal, length, anchor)
@@ -51,7 +35,7 @@ local function layoutEdge(box, pool, used, color, horizontal, length, anchor)
 end
 
 -- Returns a frame (show/hide it as a whole) holding a dotted outline around
--- `anchorTo` and a glow behind it, pulsing. `parent` owns it, so if a parent
+-- `anchorTo` and a glow behind it. `parent` owns it, so if a parent
 -- is hidden (e.g. a Baganator corner widget), the marker hides with it.
 function ns.CreateOutline(parent, anchorTo, color)
 	local box = CreateFrame("Frame", nil, parent)
@@ -79,6 +63,5 @@ function ns.CreateOutline(parent, anchorTo, color)
 	box:SetScript("OnSizeChanged", layout)
 	layout()
 
-	ns.AddPulse(box)
 	return box
 end

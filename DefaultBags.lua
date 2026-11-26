@@ -66,7 +66,7 @@ local function onClick(self, mouseButton)
 	if info then ns.HandleItemClick(mouseButton, info.itemID, info.hyperlink) end
 end
 
--- Built the first time we see a button: markers (dotted, pulsing glow -- see
+-- Built the first time we see a button: markers (dotted outline and glow -- see
 -- Markers.lua) plus the click hook.
 local function setUp(button)
 	local m = {}
@@ -85,7 +85,6 @@ local function setUp(button)
 	local coin = m.sell:CreateTexture(nil, "OVERLAY", nil, 7)
 	coin:SetAllPoints()
 	coin:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
-	ns.AddPulse(m.sell)
 	m.sell:Hide()
 
 	m.suggest = ns.CreateOutline(button, button, PINK)
