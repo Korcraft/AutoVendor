@@ -256,19 +256,32 @@ local function findBaganatorBackpacks()
 	baganatorBackpacks = found
 end
 
+-- IsVisible, not IsShown: bag addons often hide the game's own bag windows by
+-- moving them under a hidden frame, which leaves IsShown() true forever.
 local function isAnyBagOpen()
 	for i = 1, (NUM_CONTAINER_FRAMES or 13) do
 		local f = _G["ContainerFrame" .. i]
-		if f and f:IsShown() then return true end
+		if f and f:IsVisible() then return true end
 	end
-	if ContainerFrameCombinedBags and ContainerFrameCombinedBags:IsShown() then return true end
+	if ContainerFrameCombinedBags and ContainerFrameCombinedBags:IsVisible() then return true end
 	if Baganator then
 		if #baganatorBackpacks == 0 then findBaganatorBackpacks() end
 		for _, f in ipairs(baganatorBackpacks) do
-			if f:IsShown() then return true end
+			if f:IsVisible() then return true end
 		end
 	end
 	return false
+end
+
+-- Total slots in normal bags. 0 means the bag data hasn't loaded yet (right
+-- after login or a loading screen), when every bag also reports 0 free --
+-- which must not count as "full".
+local function ordinaryTotalSlots()
+	local total = 0
+	for bag = FIRST_BAG, LAST_BAG do
+		if isOrdinaryBag(bag) then total = total + (C_Container.GetContainerNumSlots(bag) or 0) end
+	end
+	return total
 end
 
 local function rescan()
@@ -276,7 +289,9 @@ local function rescan()
 	local old = keyOf(candidate)
 	if not bagOpen then
 		deleteMode = false
-	elseif free == 0 then
+	elseif free == 0 and ordinaryTotalSlots() > 0 and not (ns.IsTidying and ns.IsTidying()) then
+		-- Only starts while the bags are really full, after tidying couldn't
+		-- free anything. Once on, it stays on until the bags close.
 		deleteMode = true
 	end
 	candidate = (deleteMode and ns.BagSpaceEnabled()) and ranked[1] or nil
@@ -379,7 +394,13 @@ ns.ShowCopyableText = showCopyableText
 
 local function showReport()
 	local ranked, skipped, free, mergeable = scan()
-	local lines = { "Free slots in ordinary bags: " .. free, "" }
+	local lines = {
+		"Free slots in ordinary bags: " .. free .. " of " .. ordinaryTotalSlots(),
+		"Bag window open: " .. (isAnyBagOpen() and "yes" or "no")
+			.. "   Delete mode: " .. (deleteMode and "on" or "off")
+			.. "   Suggesting: " .. (candidate and nameOf(candidate) or "nothing"),
+		"",
+	}
 	if mergeable then
 		lines[#lines + 1] = "Partial stacks of " .. nameOf(mergeable) .. " can be merged to free a slot."
 		lines[#lines + 1] = ""
@@ -416,7 +437,10 @@ local function registerWithBaganator()
 	if not (Baganator and Baganator.API and Baganator.API.RegisterCornerWidget) then return end
 	Baganator.API.RegisterCornerWidget("AutoVendor: delete suggestion", "autovendor_delete_suggestion",
 		function(_, details)
-			return candidate ~= nil and details.itemID == candidate.itemID
+			-- By slot, so other stacks of the same item don't light up too.
+			local loc = details.itemLocation
+			return candidate ~= nil and loc ~= nil
+				and loc.bagID == candidate.bag and loc.slotIndex == candidate.slot
 		end,
 		createSuggestionMarker, { corner = "bottom_left", priority = 1 }, true)
 end
