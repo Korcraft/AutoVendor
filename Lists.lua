@@ -17,9 +17,9 @@ local getItemInfo = (C_Item and C_Item.GetItemInfo) or _G.GetItemInfo
 local getItemInfoInstant = (C_Item and C_Item.GetItemInfoInstant) or _G.GetItemInfoInstant
 
 local LISTS = {
-	{ key = "protected", title = "Whitelist - never sell", color = { 0.9, 0.1, 0.1 },
+	{ key = "protected", title = "Whitelist - never sell", colorKey = "whitelist",
 		hint = "Or Ctrl+Alt+right-click it in your bags." },
-	{ key = "sell", title = "Blacklist - always sell", color = { 1, 0.82, 0 },
+	{ key = "sell", title = "Blacklist - always sell", colorKey = "blacklist",
 		hint = "Or Ctrl+Alt+left-click it in your bags." },
 }
 
@@ -145,6 +145,7 @@ end
 function ns.RefreshLists()
 	if not AutoVendorDB then return end
 	for _, column in ipairs(columns) do
+		column.title:SetTextColor(unpack(ns.MarkerColor(column.colorKey)))
 		if column.frame:IsVisible() then refreshColumn(column) end
 	end
 end
@@ -159,7 +160,8 @@ local function buildColumn(container, spec, x, y, width)
 	local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	title:SetPoint("TOPLEFT", 2, 0)
 	title:SetText(spec.title)
-	title:SetTextColor(spec.color[1], spec.color[2], spec.color[3])
+	column.title, column.colorKey = title, spec.colorKey
+	title:SetTextColor(unpack(ns.MarkerColor(spec.colorKey)))
 	column.count = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	column.count:SetPoint("LEFT", title, "RIGHT", 4, 0)
 

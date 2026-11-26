@@ -258,19 +258,25 @@ end
 
 -- IsVisible, not IsShown: bag addons often hide the game's own bag windows by
 -- moving them under a hidden frame, which leaves IsShown() true forever.
-local function isAnyBagOpen()
-	for i = 1, (NUM_CONTAINER_FRAMES or 13) do
-		local f = _G["ContainerFrame" .. i]
-		if f and f:IsVisible() then return true end
-	end
-	if ContainerFrameCombinedBags and ContainerFrameCombinedBags:IsVisible() then return true end
+-- Returns the open bag window (Baganator's first, then the game's combined
+-- bag, then the backpack, then any other bag), or nil when none is open.
+local function openBagFrame()
 	if Baganator then
 		if #baganatorBackpacks == 0 then findBaganatorBackpacks() end
 		for _, f in ipairs(baganatorBackpacks) do
-			if f:IsVisible() then return true end
+			if f:IsVisible() then return f end
 		end
 	end
-	return false
+	if ContainerFrameCombinedBags and ContainerFrameCombinedBags:IsVisible() then return ContainerFrameCombinedBags end
+	for i = 1, (NUM_CONTAINER_FRAMES or 13) do
+		local f = _G["ContainerFrame" .. i]
+		if f and f:IsVisible() then return f end
+	end
+	return nil
+end
+
+local function isAnyBagOpen()
+	return openBagFrame() ~= nil
 end
 
 -- Total slots in normal bags. 0 means the bag data hasn't loaded yet (right
@@ -302,14 +308,124 @@ local function rescan()
 end
 ns.RescanBagSpace = rescan
 
+-- ---------------------------------------------------------------------------
+-- Delete button: sits beside the open bag window while there's a pink
+-- suggestion. Each click deletes the suggested item; the next cheapest then
+-- lights up, so clicking again deletes that one, until you close your bags.
+-- The game only lets an addon delete from a real click, so it's always one
+-- item per click -- never several at once, never on its own.
+-- ---------------------------------------------------------------------------
+
+local RARE = 3
+local deleteButton
+local deletedKey -- the slot just deleted, so a fast double click can't hit it twice
+
+function ns.DeleteButtonEnabled()
+	return AutoVendorDB == nil or AutoVendorDB.settings == nil or AutoVendorDB.settings.deleteButton ~= false
+end
+
+-- Deletes `e` if that slot still holds exactly that item and it's still allowed.
+local function deleteEntry(e)
+	if not e or keyOf(e) ~= keyOf(candidate) then return end
+	if GetCursorInfo() then
+		print(ns.PREFIX .. "Put down what's on your cursor first.")
+		return
+	end
+	local info = C_Container.GetContainerItemInfo(e.bag, e.slot)
+	if not (info and info.itemID == e.itemID) or info.isLocked or ns.isProtected(e.itemID) then
+		rescan()
+		return
+	end
+	C_Container.PickupContainerItem(e.bag, e.slot)
+	local kind, cursorID = GetCursorInfo()
+	if kind ~= "item" or cursorID ~= e.itemID then
+		ClearCursor()
+		return
+	end
+	DeleteCursorItem()
+	if GetCursorInfo() then
+		-- Still holding it: the game didn't allow the delete. Put it back.
+		ClearCursor()
+		print(ns.PREFIX .. "The game didn't let AutoVendor delete that. Drag it out of your bag to delete it by hand.")
+		return
+	end
+	deletedKey = keyOf(e)
+	print(ns.PREFIX .. "Deleted " .. describeChoice(e) .. ".")
+end
+
+-- Rare or better: asks first (the game asks too when you delete those by hand).
+StaticPopupDialogs["AUTOVENDOR_CONFIRM_DELETE"] = {
+	text = "AutoVendor: delete %s?",
+	button1 = YES or "Yes",
+	button2 = NO or "No",
+	OnAccept = function(_, e) deleteEntry(e) end,
+	timeout = 0,
+	whileDead = true,
+	hideOnEscape = true,
+	preferredIndex = 3,
+}
+
+local function onDeleteClick()
+	local e = candidate
+	if not e or keyOf(e) == deletedKey then return end
+	if (e.quality or 1) >= RARE then
+		StaticPopup_Show("AUTOVENDOR_CONFIRM_DELETE", describeChoice(e), nil, e)
+	else
+		deleteEntry(e)
+	end
+end
+
+local function createDeleteButton()
+	local b = CreateFrame("Button", "AutoVendorDeleteButton", UIParent, "UIPanelButtonTemplate")
+	b:SetSize(110, 24)
+	b:SetFrameStrata("HIGH")
+	b:SetText("Delete")
+	b.icon = b:CreateTexture(nil, "OVERLAY")
+	b.icon:SetSize(18, 18)
+	b.icon:SetPoint("RIGHT", b, "LEFT", -3, 0)
+	b:SetScript("OnClick", onDeleteClick)
+	b:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+		GameTooltip:AddLine("Delete the pink-outlined item", 1, 1, 1)
+		if candidate then
+			GameTooltip:AddLine(describeChoice(candidate), nil, nil, nil, true)
+		end
+		GameTooltip:AddLine("Deletes it for good. The next cheapest item then lights up; "
+			.. "click again to delete that one too. Closes with your bags.", nil, nil, nil, true)
+		GameTooltip:Show()
+	end)
+	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	b:Hide()
+	return b
+end
+
+local function updateDeleteButton()
+	local bagFrame = candidate and ns.DeleteButtonEnabled() and openBagFrame()
+	if not bagFrame then
+		if deleteButton then deleteButton:Hide() end
+		return
+	end
+	deleteButton = deleteButton or createDeleteButton()
+	deleteButton:ClearAllPoints()
+	-- Left of the bag window's top-left corner; the icon sits left of the button.
+	deleteButton:SetPoint("TOPRIGHT", bagFrame, "TOPLEFT", -4, -24)
+	deleteButton.icon:SetTexture(C_Container.GetContainerItemInfo(candidate.bag, candidate.slot)
+		and C_Container.GetContainerItemInfo(candidate.bag, candidate.slot).iconFileID or nil)
+	if deletedKey and keyOf(candidate) ~= deletedKey then deletedKey = nil end
+	deleteButton:SetEnabled(keyOf(candidate) ~= deletedKey)
+	deleteButton:Show()
+end
+
 -- Watches for bag windows opening and closing (any bag UI).
 local function watchBags()
 	C_Timer.NewTicker(0.2, function()
 		local open = isAnyBagOpen()
 		if open ~= bagOpen then
 			bagOpen = open
+			if not open then deletedKey = nil end
 			rescan()
 		end
+		updateDeleteButton()
 	end)
 end
 
@@ -422,14 +538,14 @@ local function showReport()
 end
 
 -- ---------------------------------------------------------------------------
--- Baganator marker on the suggested item (hot pink, dotted, with a glow)
+-- Baganator marker on the suggested item (hot pink by default, dotted, with a glow)
 -- ---------------------------------------------------------------------------
 
 local function createSuggestionMarker(itemButton)
 	local marker = CreateFrame("Frame", nil, itemButton)
 	marker:SetSize(1, 1)
 	marker.padding = 0
-	ns.CreateOutline(marker, itemButton, { 1, 0.2, 0.6 })
+	ns.CreateOutline(marker, itemButton, "suggest")
 	return marker
 end
 

@@ -345,7 +345,7 @@ events:SetScript("OnEvent", function(self, event, addonName)
 		AutoVendorCharDB = AutoVendorCharDB or {}
 		AutoVendorCharDB.sell = AutoVendorCharDB.sell or {}
 		AutoVendorCharDB.protected = AutoVendorCharDB.protected or {}
-		for key, default in pairs({ sellGrays = true, sellMarked = true, repair = true, bagSpace = true,
+		for key, default in pairs({ sellGrays = true, sellMarked = true, repair = true, bagSpace = true, deleteButton = true,
 			moveToSpecialBags = true, mergeStacks = true, guardSales = true, guardTrades = true }) do
 			if AutoVendorDB.settings[key] == nil then AutoVendorDB.settings[key] = default end
 		end

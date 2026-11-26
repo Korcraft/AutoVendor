@@ -5,10 +5,6 @@
 
 local _, ns = ...
 
-local RED = { 0.9, 0.1, 0.1 }
-local GOLD = { 1, 0.82, 0 }
-local PINK = { 1, 0.2, 0.6 } -- no item quality or quest border uses pink
-
 -- ---------------------------------------------------------------------------
 -- Finding the default bag buttons
 -- ---------------------------------------------------------------------------
@@ -78,7 +74,7 @@ local function setUp(button)
 	m.sellOnce:Hide()
 	m.blacklist:Hide()
 
-	m.suggest = ns.CreateOutline(button, button, PINK)
+	m.suggest = ns.CreateOutline(button, button, "suggest")
 	m.suggest:Hide()
 
 	button.AutoVendorMarkers = m
@@ -138,13 +134,13 @@ local function addTooltipLines(tooltip, bag, slot)
 		sellOnce = "AutoVendor: will be sold (this time)",
 	})[mark]
 	if text then
-		local c = (mark == "whitelist" or mark == "protectOnce") and RED or GOLD
+		local c = ns.MarkerColor(mark)
 		tooltip:AddLine(text, c[1], c[2], c[3])
 		added = true
 	end
 	local s = ns.GetDeleteSuggestion and ns.GetDeleteSuggestion()
 	if s and s.bag == bag and s.slot == slot then
-		tooltip:AddLine("AutoVendor: least valuable item - suggested to delete", PINK[1], PINK[2], PINK[3])
+		tooltip:AddLine("AutoVendor: least valuable item - suggested to delete", unpack(ns.MarkerColor("suggest")))
 		added = true
 	end
 	if added then tooltip:Show() end

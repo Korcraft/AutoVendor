@@ -4,14 +4,43 @@
 -- Baganator (AutoVendor.lua, BagSpace.lua).
 --   protect once (Alt+right-click)       red dotted outline + X
 --   whitelist   (Ctrl+Alt+right-click)   red solid outline + X
---   sell once   (Alt+left-click)         gold coin
---   blacklist   (Ctrl+Alt+left-click)    gold coin + gold solid outline
+--   sell once   (Alt+left-click)         gold dotted outline + coin
+--   blacklist   (Ctrl+Alt+left-click)    gold solid outline + coin
 --   delete suggestion                    hot pink dotted outline
+-- Each of the five outline colours can be changed in /av (AutoVendorDB.colors);
+-- markers already drawn pick up a change straight away.
 
 local _, ns = ...
 
 local DASH, GAP, THICKNESS = 4, 3, 2
 local GLOW_SCALE = 1.75 -- the glow texture's bright ring sits well inside its edges
+
+ns.MARKER_COLORS = { -- in the order the settings page shows them
+	{ key = "whitelist", label = "Whitelist", default = { 0.9, 0.1, 0.1 } },
+	{ key = "protectOnce", label = "Protect once", default = { 0.9, 0.1, 0.1 } },
+	{ key = "suggest", label = "Delete suggestion", default = { 1, 0.2, 0.6 } },
+	{ key = "blacklist", label = "Blacklist", default = { 1, 0.82, 0 } },
+	{ key = "sellOnce", label = "Sell once", default = { 1, 0.82, 0 } },
+}
+local DEFAULT_COLOR = {}
+for _, c in ipairs(ns.MARKER_COLORS) do DEFAULT_COLOR[c.key] = c.default end
+
+-- The colour ({ r, g, b }) for one kind of marker: the player's pick, or the default.
+function ns.MarkerColor(key)
+	local saved = AutoVendorDB and AutoVendorDB.colors and AutoVendorDB.colors[key]
+	if type(saved) == "table" and saved[1] and saved[2] and saved[3] then return saved end
+	return DEFAULT_COLOR[key]
+end
+
+local redraws = {} -- one per outline built
+
+-- r = nil puts that marker back to its default colour.
+function ns.SetMarkerColor(key, r, g, b)
+	AutoVendorDB.colors = AutoVendorDB.colors or {}
+	AutoVendorDB.colors[key] = r and { r, g, b } or nil
+	for _, redraw in ipairs(redraws) do redraw() end
+	if ns.RefreshLists then ns.RefreshLists() end
+end
 
 -- Lays dashes along one edge of `box`, reusing textures from `pool`. A solid
 -- edge is one dash the whole length.
@@ -46,8 +75,8 @@ end
 -- `anchorTo` and a glow behind it: dotted for one-time marks and the delete
 -- suggestion, solid (`solid` = true) for the permanent lists. `parent` owns
 -- it, so if a parent is hidden (e.g. a Baganator corner widget), the marker
--- hides with it.
-function ns.CreateOutline(parent, anchorTo, color, solid)
+-- hides with it. `colorKey` is one of the ns.MARKER_COLORS keys.
+function ns.CreateOutline(parent, anchorTo, colorKey, solid)
 	local box = CreateFrame("Frame", nil, parent)
 	box:SetAllPoints(anchorTo)
 	box:SetFrameLevel(anchorTo:GetFrameLevel() + 2)
@@ -55,13 +84,14 @@ function ns.CreateOutline(parent, anchorTo, color, solid)
 	local glow = box:CreateTexture(nil, "OVERLAY", nil, 6)
 	glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
 	glow:SetBlendMode("ADD")
-	glow:SetVertexColor(color[1], color[2], color[3], 0.9)
 	glow:SetPoint("CENTER", box, "CENTER")
 
 	local pool = {}
 	local function layout()
 		local w, h = box:GetSize()
 		if not w or w <= 0 or not h or h <= 0 then return end
+		local color = ns.MarkerColor(colorKey)
+		glow:SetVertexColor(color[1], color[2], color[3], 0.9)
 		glow:SetSize(w * GLOW_SCALE, h * GLOW_SCALE)
 		local used = 0
 		used = layoutEdge(box, pool, used, color, true, w, "TOPLEFT", solid)
@@ -72,17 +102,15 @@ function ns.CreateOutline(parent, anchorTo, color, solid)
 	end
 	box:SetScript("OnSizeChanged", layout)
 	layout()
+	redraws[#redraws + 1] = layout
 
 	return box
 end
 
-local RED = { 0.9, 0.1, 0.1 }
-local GOLD = { 1, 0.82, 0 }
-
 -- Both corner markers return the small corner frame (which Baganator places
 -- as a corner widget); the outline hangs off it but covers the whole slot.
 
--- Protect marker: an X in the corner plus a red outline (solid = whitelist).
+-- Protect marker: an X in the corner plus an outline (solid = whitelist).
 function ns.CreateProtectMarker(parent, anchorTo, solid)
 	local xFrame = CreateFrame("Frame", nil, parent)
 	xFrame:SetSize(16, 16)
@@ -91,12 +119,11 @@ function ns.CreateProtectMarker(parent, anchorTo, solid)
 	local x = xFrame:CreateTexture(nil, "OVERLAY", nil, 7)
 	x:SetAllPoints()
 	x:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
-	ns.CreateOutline(xFrame, anchorTo, RED, solid)
+	ns.CreateOutline(xFrame, anchorTo, solid and "whitelist" or "protectOnce", solid)
 	return xFrame
 end
 
--- Sell marker: a gold coin in the corner, plus a solid gold outline for the
--- blacklist.
+-- Sell marker: a gold coin in the corner plus an outline (solid = blacklist).
 function ns.CreateSellMarker(parent, anchorTo, solid)
 	local coinFrame = CreateFrame("Frame", nil, parent)
 	coinFrame:SetSize(14, 14)
@@ -105,6 +132,6 @@ function ns.CreateSellMarker(parent, anchorTo, solid)
 	local coin = coinFrame:CreateTexture(nil, "OVERLAY", nil, 7)
 	coin:SetAllPoints()
 	coin:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
-	if solid then ns.CreateOutline(coinFrame, anchorTo, GOLD, true) end
+	ns.CreateOutline(coinFrame, anchorTo, solid and "blacklist" or "sellOnce", solid)
 	return coinFrame
 end
