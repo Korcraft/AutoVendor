@@ -62,7 +62,9 @@ local function checkBuyback()
 		if link then
 			seen[link] = (seen[link] or 0) + 1
 			local isNew = seen[link] > (known[link] or 0)
-			if isNew and ns.isProtected(itemIDFromLink(link)) then
+			local itemID = itemIDFromLink(link)
+			-- Whitelisted, or a protected-once stack that just left your bags.
+			if isNew and (ns.isProtected(itemID) or ns.TakeSoldOnceProtect(itemID)) then
 				BuybackItem(i)
 				warn("PROTECTED ITEM SOLD - " .. link .. " bought back")
 				print(ns.PREFIX .. link .. " is protected - bought it back. "
@@ -85,7 +87,8 @@ end
 local function checkTradeSlot(slot)
 	if not (setting("guardTrades") and GetTradePlayerItemLink and ClickTradeButton) then return end
 	local link = GetTradePlayerItemLink(slot)
-	if not (link and ns.isProtected(itemIDFromLink(link))) then return end
+	local itemID = itemIDFromLink(link)
+	if not (link and (ns.isProtected(itemID) or ns.IsOnceProtectedInTrade(itemID))) then return end
 	if GetCursorInfo() then return end -- don't drop something you're holding
 	ClickTradeButton(slot)            -- picks it back up out of the trade slot...
 	if GetCursorInfo() then ClearCursor() end -- ...and returns it to its bag slot

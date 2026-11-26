@@ -118,7 +118,7 @@ local function describe(bag, slot, info)
 	local _, _, _, _, _, _, _, maxStack, _, _, unitPrice = getItemInfo(info.hyperlink or info.itemID)
 	e.maxStack = maxStack or 1
 
-	if ns.isProtected(info.itemID) then e.skip = "protected / whitelist"
+	if ns.isProtected(info.itemID, bag, slot) then e.skip = "protected / whitelist"
 	elseif TOOLS[info.itemID] then e.skip = "tool"
 	elseif isQuestItem(bag, slot, classID) then e.skip = "quest item"
 	elseif classID == CLASS_KEY then e.skip = "key"
@@ -131,7 +131,7 @@ local function describe(bag, slot, info)
 	elseif info.hasNoValue or unitPrice <= 0 then e.skip = "no vendor price"
 	else
 		e.value = unitPrice * e.count
-		e.marked = ns.isMarkedToSell(info.itemID)
+		e.marked = ns.isMarkedToSell(info.itemID, bag, slot)
 		if not e.marked then e.lastResort = KEEP_LAST[classID] end
 	end
 	return e
@@ -332,7 +332,7 @@ local function deleteEntry(e)
 		return
 	end
 	local info = C_Container.GetContainerItemInfo(e.bag, e.slot)
-	if not (info and info.itemID == e.itemID) or info.isLocked or ns.isProtected(e.itemID) then
+	if not (info and info.itemID == e.itemID) or info.isLocked or ns.isProtected(e.itemID, e.bag, e.slot) then
 		rescan()
 		return
 	end
@@ -640,6 +640,6 @@ SlashCmdList.AUTOVENDOR = function(msg)
 		print(ns.PREFIX .. "/av space - show what to delete when your bags are full.")
 		print(ns.PREFIX .. "/av sell [item] - add to or remove from your blacklist (always sold).")
 		print(ns.PREFIX .. "/av protect [item] - add to or remove from your whitelist (never sold).")
-		print(ns.PREFIX .. "In your bags: Alt+left/right-click = sell/protect this time only; Ctrl+Alt+left/right-click = blacklist/whitelist.")
+		print(ns.PREFIX .. "In your bags: Alt+left/right-click = sell/protect that stack only; Ctrl+Alt+left/right-click = blacklist/whitelist.")
 	end
 end

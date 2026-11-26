@@ -3,7 +3,7 @@
 --     deletion, bought back / pulled out of trades if sold or traded by hand.
 --   Blacklist (AutoVendorDB.sell)      = sold at every vendor, gray or not.
 -- Permanent: saved by item type, for all your characters, until you take an
--- item off. Ctrl+Alt+click in your bags changes them too. (Plain Alt+click is a separate one-time mark.) Add an item
+-- item off. Ctrl+Alt+click in your bags changes them too. (Plain Alt+click is a separate one-time mark on just that stack.) Add an item
 -- by typing its ID or name, Shift+clicking an item link, or dropping an item
 -- on the panel.
 

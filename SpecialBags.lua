@@ -52,7 +52,7 @@ local function mergeStacks(names, tried)
 		local ordinary = bag == 0 or select(2, C_Container.GetContainerNumFreeSlots(bag)) == 0
 		for slot = 1, C_Container.GetContainerNumSlots(bag) do
 			local info = C_Container.GetContainerItemInfo(bag, slot)
-			if info and info.itemID and not info.isLocked then
+			if info and info.itemID and not info.isLocked and not ns.HasOnceMark(bag, slot) then
 				local maxStack = select(8, getItemInfo(info.itemID))
 				local count = info.stackCount or 1
 				if maxStack and maxStack > 1 and count < maxStack then
@@ -140,7 +140,7 @@ local function moveToSpecialBags(names, tried)
 		if isOrdinaryBag(bag) then
 			for slot = 1, C_Container.GetContainerNumSlots(bag) do
 				local info = C_Container.GetContainerItemInfo(bag, slot)
-				if info and info.itemID and not info.isLocked then
+				if info and info.itemID and not info.isLocked and not ns.HasOnceMark(bag, slot) then
 					local _, _, _, _, _, classID = getItemInfoInstant(info.itemID)
 					-- Bags and quivers carry their own family; never move those.
 					local family = (classID ~= CLASS_CONTAINER and classID ~= CLASS_QUIVER)

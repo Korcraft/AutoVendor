@@ -53,36 +53,150 @@ local function sellPriceOf(info)
 	return price * (info.stackCount or 1)
 end
 
+-- ---------------------------------------------------------------------------
+-- Marks. The whitelist and blacklist are by item type (every copy, always).
+-- One-time marks (Alt+click) belong to the one stack you clicked: other
+-- stacks of the same item are left alone. They're saved per character in
+-- AutoVendorCharDB.once, keyed by the stack's item GUID, so the mark follows
+-- the stack if you drag it to another slot. (Without GUIDs on a client, the
+-- key falls back to the bag slot.)
+-- ---------------------------------------------------------------------------
+
+local function onceKey(bag, slot)
+	if not (bag and slot) then return nil end
+	if C_Item and C_Item.GetItemGUID and ItemLocation and ItemLocation.CreateFromBagAndSlot then
+		local ok, guid = pcall(function()
+			local loc = ItemLocation:CreateFromBagAndSlot(bag, slot)
+			if C_Item.DoesItemExist and not C_Item.DoesItemExist(loc) then return nil end
+			return C_Item.GetItemGUID(loc)
+		end)
+		if ok and guid then return guid end
+	end
+	return "slot:" .. bag .. ":" .. slot
+end
+
+-- The one-time mark ({ kind = "sell"|"protected", itemID }) on a bag slot, or nil.
+local function onceMarkAt(bag, slot, itemID)
+	if not (AutoVendorCharDB and AutoVendorCharDB.once) then return nil end
+	local key = onceKey(bag, slot)
+	local m = key and AutoVendorCharDB.once[key]
+	if m and (itemID == nil or m.itemID == itemID) then return m, key end
+	return nil
+end
+function ns.HasOnceMark(bag, slot)
+	local info = C_Container.GetContainerItemInfo(bag, slot)
+	return info ~= nil and onceMarkAt(bag, slot, info.itemID) ~= nil
+end
+
 -- How an item is marked: "whitelist", "blacklist", "protectOnce", "sellOnce"
--- or nil. The permanent lists win over a one-time mark.
-local function markOf(itemID)
+-- or nil. The permanent lists win over a one-time mark. Without `bag` and
+-- `slot` only the lists are checked.
+local function markOf(itemID, bag, slot)
 	local db = AutoVendorDB
-	if not (itemID and db and AutoVendorCharDB) then return nil end
+	if not (itemID and db) then return nil end
 	if db.protected[itemID] then return "whitelist" end
 	if db.sell[itemID] then return "blacklist" end
-	if AutoVendorCharDB.protected[itemID] then return "protectOnce" end
-	if AutoVendorCharDB.sell[itemID] then return "sellOnce" end
+	local m = onceMarkAt(bag, slot, itemID)
+	if m then return m.kind == "sell" and "sellOnce" or "protectOnce" end
 	return nil
 end
 ns.MarkOf = markOf
 
-local function isProtected(itemID)
-	local m = markOf(itemID)
+local function isProtected(itemID, bag, slot)
+	local m = markOf(itemID, bag, slot)
 	return m == "whitelist" or m == "protectOnce"
 end
 ns.isProtected = isProtected
 
-local function isMarkedToSell(itemID)
-	local m = markOf(itemID)
+local function isMarkedToSell(itemID, bag, slot)
+	local m = markOf(itemID, bag, slot)
 	return m == "blacklist" or m == "sellOnce"
 end
 ns.isMarkedToSell = isMarkedToSell
 
-local function shouldSell(info)
-	if not info or info.hasNoValue or isProtected(info.itemID) then return false end
+-- Every one-time-marked stack still in your bags: key -> { bag, slot, info }.
+local function carriedOnceMarks()
+	local found = {}
+	for bag = FIRST_BAG, LAST_BAG do
+		for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do
+			local info = C_Container.GetContainerItemInfo(bag, slot)
+			if info and info.itemID then
+				local m, key = onceMarkAt(bag, slot, info.itemID)
+				if m then found[key] = { bag = bag, slot = slot, info = info } end
+			end
+		end
+	end
+	return found
+end
+
+-- For Guard.lua: a protected-once stack of this item that's gone from your
+-- bags (you sold it by hand). Takes the mark off it and remembers to put it
+-- back on the stack once it's bought back. True if there was one.
+local reprotect = {} -- itemID -> { n = stacks to mark again, before = keys in your bags at the sale }
+local function allKeysOf(itemID)
+	local keys = {}
+	for bag = FIRST_BAG, LAST_BAG do
+		for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do
+			local info = C_Container.GetContainerItemInfo(bag, slot)
+			if info and info.itemID == itemID then keys[onceKey(bag, slot)] = true end
+		end
+	end
+	return keys
+end
+function ns.TakeSoldOnceProtect(itemID)
+	if not (itemID and AutoVendorCharDB and AutoVendorCharDB.once) then return false end
+	local carried = carriedOnceMarks()
+	for key, m in pairs(AutoVendorCharDB.once) do
+		if m.kind == "protected" and m.itemID == itemID and not carried[key] then
+			AutoVendorCharDB.once[key] = nil
+			local r = reprotect[itemID] or { n = 0, before = allKeysOf(itemID) }
+			r.n = r.n + 1
+			reprotect[itemID] = r
+			return true
+		end
+	end
+	return false
+end
+
+-- For Guard.lua: is a protected-once stack of this item locked in your bags
+-- (items in the trade window stay in the bag, locked)?
+function ns.IsOnceProtectedInTrade(itemID)
+	for _, c in pairs(carriedOnceMarks()) do
+		if c.info.itemID == itemID and c.info.isLocked
+			and AutoVendorCharDB.once[onceKey(c.bag, c.slot)].kind == "protected" then
+			return true
+		end
+	end
+	return false
+end
+
+-- Bought-back stacks come back as new items, so put their mark back on the
+-- stack of that item that wasn't in your bags when it was sold.
+local function applyReprotect()
+	for itemID, r in pairs(reprotect) do
+		for bag = FIRST_BAG, LAST_BAG do
+			for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do
+				local info = C_Container.GetContainerItemInfo(bag, slot)
+				local key = info and info.itemID == itemID and onceKey(bag, slot)
+				if key and r.n > 0 and not r.before[key] and not AutoVendorCharDB.once[key] then
+					AutoVendorCharDB.once[key] = { kind = "protected", itemID = itemID }
+					r.before[key] = true
+					r.n = r.n - 1
+					ns.RefreshVisuals()
+				end
+			end
+		end
+		if r.n <= 0 then reprotect[itemID] = nil end
+	end
+end
+-- Forgets bought-back stacks that never came back (vendor closed).
+local function clearReprotect() reprotect = {} end
+
+local function shouldSell(info, bag, slot)
+	if not info or info.hasNoValue or isProtected(info.itemID, bag, slot) then return false end
 	local s = AutoVendorDB.settings
 	return (s.sellGrays and info.quality == QUALITY_POOR)
-		or (s.sellMarked and isMarkedToSell(info.itemID))
+		or (s.sellMarked and isMarkedToSell(info.itemID, bag, slot))
 end
 
 -- Returns the repair cost paid, or nil plus the unpaid cost if short on gold.
@@ -126,7 +240,7 @@ local function sellPass(id, state)
 		for slot = 1, C_Container.GetContainerNumSlots(bag) do
 			local info = C_Container.GetContainerItemInfo(bag, slot)
 			local key = bag .. ":" .. slot
-			if shouldSell(info) and not state.sent[key] then
+			if shouldSell(info, bag, slot) and not state.sent[key] then
 				if info.isLocked or soldThisPass >= SELL_BATCH then
 					moreToDo = true
 				else
@@ -174,8 +288,9 @@ local function labelOf(itemID, itemLink)
 	return (getInfo and select(2, getInfo(itemID))) or ("item " .. itemID)
 end
 
--- One-time marks (Alt+click). `kind` is "sell" or "protected".
-local function toggleOnce(kind, itemID, itemLink)
+-- One-time marks (Alt+click) on the one stack in `bag`/`slot`. `kind` is
+-- "sell" or "protected".
+local function toggleOnce(kind, itemID, itemLink, bag, slot)
 	if not AutoVendorDB then return end
 	local label = labelOf(itemID, itemLink)
 	local m = markOf(itemID)
@@ -185,17 +300,21 @@ local function toggleOnce(kind, itemID, itemLink)
 		afterMarkChange()
 		return
 	end
-	local once = AutoVendorCharDB
-	local other = kind == "sell" and "protected" or "sell"
-	if once[kind][itemID] then
-		once[kind][itemID] = nil
+	local key = onceKey(bag, slot)
+	if not key then
+		print(PREFIX .. "Couldn't tell which bag slot that was. One-time marks only work on items in your bags.")
+		afterMarkChange()
+		return
+	end
+	local current = onceMarkAt(bag, slot, itemID)
+	if current and current.kind == kind then
+		AutoVendorCharDB.once[key] = nil
 		print(PREFIX .. label .. (kind == "sell" and " is no longer marked to sell." or " is no longer protected."))
 	else
-		once[kind][itemID] = true
-		once[other][itemID] = nil
+		AutoVendorCharDB.once[key] = { kind = kind, itemID = itemID }
 		print(PREFIX .. label .. (kind == "sell"
-			and " will be sold at the next vendor (this time only - Ctrl+Alt+left-click to always sell it)."
-			or " is protected while you carry it (this time only - Ctrl+Alt+right-click to always keep it)."))
+			and " (this stack) will be sold at the next vendor. Ctrl+Alt+left-click to always sell every one."
+			or " (this stack) is protected. Ctrl+Alt+right-click to always keep every one."))
 	end
 	afterMarkChange()
 end
@@ -215,11 +334,13 @@ ns.ToggleSell = function(itemID, itemLink) togglePermanent("sell", itemID, itemL
 
 -- Puts an item on one permanent list ("protected" = whitelist, "sell" =
 -- blacklist), or takes it off both when `list` is nil. Used by the list panels.
+-- Any one-time marks on stacks of it go too: the list decides for all of them now.
 function ns.SetListed(itemID, list, itemLink)
 	if not (AutoVendorDB and itemID) then return end
 	local label = labelOf(itemID, itemLink)
-	AutoVendorCharDB.protected[itemID] = nil
-	AutoVendorCharDB.sell[itemID] = nil
+	for key, m in pairs(AutoVendorCharDB.once) do
+		if m.itemID == itemID then AutoVendorCharDB.once[key] = nil end
+	end
 	AutoVendorDB.protected[itemID] = nil
 	AutoVendorDB.sell[itemID] = nil
 	if list == "protected" then
@@ -234,52 +355,43 @@ function ns.SetListed(itemID, list, itemLink)
 	afterMarkChange()
 end
 
--- Drops one-time marks for items you no longer carry. Waits while a vendor
--- or trade window is open: a protected item sold or traded by hand is gone
--- from your bags until Guard.lua gets it back, and must stay protected.
+-- Drops one-time marks for stacks you no longer carry (sold, deleted, merged
+-- away). Waits while a vendor or trade window is open: a protected stack sold
+-- or traded by hand is gone from your bags until Guard.lua gets it back, and
+-- must stay protected.
 local function pruneOnceMarks()
-	local db = AutoVendorDB
-	if not (db and AutoVendorCharDB) then return end
+	if not (AutoVendorDB and AutoVendorCharDB and AutoVendorCharDB.once) then return end
 	if (MerchantFrame and MerchantFrame:IsShown()) or (TradeFrame and TradeFrame:IsShown()) then return end
-	if not (next(AutoVendorCharDB.sell) or next(AutoVendorCharDB.protected)) then return end
-	local carried, slots = {}, 0
-	for bag = FIRST_BAG, LAST_BAG do
-		local n = C_Container.GetContainerNumSlots(bag) or 0
-		slots = slots + n
-		for slot = 1, n do
-			local info = C_Container.GetContainerItemInfo(bag, slot)
-			if info and info.itemID then carried[info.itemID] = true end
-		end
-	end
+	clearReprotect()
+	if not next(AutoVendorCharDB.once) then return end
+	local slots = 0
+	for bag = FIRST_BAG, LAST_BAG do slots = slots + (C_Container.GetContainerNumSlots(bag) or 0) end
 	if slots == 0 then return end -- bag data not loaded yet (login, loading screen)
-	if GetCursorInfo() == "item" then
-		local _, cursorID = GetCursorInfo()
-		if cursorID then carried[cursorID] = true end -- being moved, still yours
-	end
+	-- A stack on the cursor is still in its slot (locked) until it's dropped.
+	local carried = carriedOnceMarks()
 	local changed = false
-	for _, marks in pairs({ AutoVendorCharDB.sell, AutoVendorCharDB.protected }) do
-		for itemID in pairs(marks) do
-			if not carried[itemID] then
-				marks[itemID] = nil
-				changed = true
-			end
+	for key in pairs(AutoVendorCharDB.once) do
+		if not carried[key] then
+			AutoVendorCharDB.once[key] = nil
+			changed = true
 		end
 	end
 	if changed then ns.RefreshVisuals() end
 end
 
 -- The one place that decides what a modified click on a bag item means, so
--- every bag UI behaves the same. Returns true if the click was ours.
-function ns.HandleItemClick(mouseButton, itemID, itemLink)
+-- every bag UI behaves the same. Returns true if the click was ours. `bag`
+-- and `slot` say which stack a one-time mark goes on.
+function ns.HandleItemClick(mouseButton, itemID, itemLink, bag, slot)
 	if not itemID then return false end
 	local alt, ctrl, shift = IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
 	if not alt or shift then return false end
 	-- Alt = one-time mark; Ctrl+Alt = permanent list.
 	if mouseButton == "LeftButton" then
-		if ctrl then togglePermanent("sell", itemID, itemLink) else toggleOnce("sell", itemID, itemLink) end
+		if ctrl then togglePermanent("sell", itemID, itemLink) else toggleOnce("sell", itemID, itemLink, bag, slot) end
 		return true
 	elseif mouseButton == "RightButton" then
-		if ctrl then togglePermanent("protected", itemID, itemLink) else toggleOnce("protected", itemID, itemLink) end
+		if ctrl then togglePermanent("protected", itemID, itemLink) else toggleOnce("protected", itemID, itemLink, bag, slot) end
 		return true
 	end
 	return false
@@ -297,7 +409,9 @@ local function hookClicks(itemButton)
 	itemButton.AutoVendorClicks = true
 	itemButton:HookScript("OnClick", function(self, mouseButton)
 		local details = self.BGR
-		if details then ns.HandleItemClick(mouseButton, details.itemID, details.itemLink) end
+		if not details then return end
+		local loc = details.itemLocation
+		ns.HandleItemClick(mouseButton, details.itemID, details.itemLink, loc and loc.bagID, loc and loc.slotIndex)
 	end)
 end
 
@@ -316,7 +430,10 @@ local function registerWithBaganator()
 	-- An item only ever has one of these marks, so they can share the corner.
 	local function add(label, id, kind, create, solid, priority)
 		Baganator.API.RegisterCornerWidget(label, id,
-			function(_, details) return markOf(details.itemID) == kind end,
+			function(_, details)
+				local loc = details.itemLocation
+				return markOf(details.itemID, loc and loc.bagID, loc and loc.slotIndex) == kind
+			end,
 			markerMaker(create, solid), { corner = "top_left", priority = priority }, true)
 	end
 	add("AutoVendor: whitelist", "autovendor_whitelist", "whitelist", ns.CreateProtectMarker, true, 1)
@@ -341,10 +458,11 @@ events:SetScript("OnEvent", function(self, event, addonName)
 		AutoVendorDB.protected = AutoVendorDB.protected or {}
 		AutoVendorDB.sell = AutoVendorDB.sell or {}
 		AutoVendorDB.settings = AutoVendorDB.settings or {}
-		-- One-time marks are about what this character carries, so per character.
+		-- One-time marks are about the stacks this character carries, so per
+		-- character. (Before 1.4 they were by item type in .sell/.protected.)
 		AutoVendorCharDB = AutoVendorCharDB or {}
-		AutoVendorCharDB.sell = AutoVendorCharDB.sell or {}
-		AutoVendorCharDB.protected = AutoVendorCharDB.protected or {}
+		AutoVendorCharDB.once = AutoVendorCharDB.once or {}
+		AutoVendorCharDB.sell, AutoVendorCharDB.protected = nil, nil
 		for key, default in pairs({ sellGrays = true, sellMarked = true, repair = true, bagSpace = true, deleteButton = true,
 			moveToSpecialBags = true, mergeStacks = true, guardSales = true, guardTrades = true }) do
 			if AutoVendorDB.settings[key] == nil then AutoVendorDB.settings[key] = default end
@@ -352,7 +470,11 @@ events:SetScript("OnEvent", function(self, event, addonName)
 		registerWithBaganator()
 		return
 	end
-	if event == "BAG_UPDATE_DELAYED" then pruneOnceMarks() return end
+	if event == "BAG_UPDATE_DELAYED" then
+		applyReprotect()
+		pruneOnceMarks()
+		return
+	end
 	if event == "TRADE_CLOSED" then C_Timer.After(1, pruneOnceMarks) return end
 	session = session + 1
 	if event == "MERCHANT_SHOW" then

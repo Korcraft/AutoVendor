@@ -31,7 +31,7 @@ local OPTIONS = {
 		help = "Sells every gray item when you open a vendor. Whitelisted items are never sold." },
 	{ label = "Sell blacklisted and Alt+clicked items", option = setting("sellMarked"),
 		help = "Sells everything on your blacklist (below), and anything you Alt+left-clicked in your bags "
-			.. "(gold coin, this time only), along with the grays when you open a vendor, whatever its quality." },
+			.. "(gold coin, that stack only), along with the grays when you open a vendor, whatever its quality." },
 	{ label = "Repair gear at vendors", option = setting("repair"),
 		help = "Repairs all your gear with your own gold (never guild funds) when the vendor can repair." },
 	{ label = "Suggest what to delete when bags are full", option = setting("bagSpace"),

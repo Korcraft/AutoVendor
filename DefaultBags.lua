@@ -57,7 +57,7 @@ local function onClick(self, mouseButton)
 	local bag, slot = slotOf(self)
 	if not bag then return end
 	local info = C_Container.GetContainerItemInfo(bag, slot)
-	if info then ns.HandleItemClick(mouseButton, info.itemID, info.hyperlink) end
+	if info then ns.HandleItemClick(mouseButton, info.itemID, info.hyperlink, bag, slot) end
 end
 
 -- Built the first time we see a button: markers (dotted outline and glow -- see
@@ -89,7 +89,7 @@ local function updateButton(button)
 		local bag, slot = slotOf(button)
 		local info = bag and C_Container.GetContainerItemInfo(bag, slot)
 		if info and info.itemID then
-			mark = ns.MarkOf(info.itemID)
+			mark = ns.MarkOf(info.itemID, bag, slot)
 			local s = ns.GetDeleteSuggestion and ns.GetDeleteSuggestion()
 			suggested = s ~= nil and s.bag == bag and s.slot == slot
 		end
@@ -126,12 +126,12 @@ local function addTooltipLines(tooltip, bag, slot)
 	local info = C_Container.GetContainerItemInfo(bag, slot)
 	if not (info and info.itemID) then return end
 	local added = false
-	local mark = ns.MarkOf(info.itemID)
+	local mark = ns.MarkOf(info.itemID, bag, slot)
 	local text = ({
 		whitelist = "AutoVendor: whitelist - never sold",
-		protectOnce = "AutoVendor: protected (this time)",
+		protectOnce = "AutoVendor: protected (this stack)",
 		blacklist = "AutoVendor: blacklist - always sold",
-		sellOnce = "AutoVendor: will be sold (this time)",
+		sellOnce = "AutoVendor: will be sold (this stack)",
 	})[mark]
 	if text then
 		local c = ns.MarkerColor(mark)
