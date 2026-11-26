@@ -1,9 +1,7 @@
 -- DefaultBags: the same markers and clicks as in Baganator, but for the
 -- game's own bag windows, plus tooltip lines that show up in any bag UI that
 -- uses the standard bag tooltip.
---   red outline + X   = protected (Alt+right-click)
---   gold coin         = marked to sell (Alt+left-click)
---   hot pink outline  = suggested to delete while your bags are full
+-- What each marker means is listed at the top of Markers.lua.
 
 local _, ns = ...
 
@@ -69,23 +67,16 @@ end
 -- Built the first time we see a button: markers (dotted outline and glow -- see
 -- Markers.lua) plus the click hook.
 local function setUp(button)
-	local m = {}
-
-	m.protect = ns.CreateOutline(button, button, RED)
-	local x = m.protect:CreateTexture(nil, "OVERLAY", nil, 7)
-	x:SetSize(16, 16)
-	x:SetPoint("TOPLEFT")
-	x:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
-	m.protect:Hide()
-
-	m.sell = CreateFrame("Frame", nil, button)
-	m.sell:SetSize(14, 14)
-	m.sell:SetPoint("TOPLEFT", 1, -1)
-	m.sell:SetFrameLevel(button:GetFrameLevel() + 2)
-	local coin = m.sell:CreateTexture(nil, "OVERLAY", nil, 7)
-	coin:SetAllPoints()
-	coin:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
-	m.sell:Hide()
+	local m = {
+		protectOnce = ns.CreateProtectMarker(button, button, false),
+		whitelist = ns.CreateProtectMarker(button, button, true),
+		sellOnce = ns.CreateSellMarker(button, button, false),
+		blacklist = ns.CreateSellMarker(button, button, true),
+	}
+	m.protectOnce:Hide()
+	m.whitelist:Hide()
+	m.sellOnce:Hide()
+	m.blacklist:Hide()
 
 	m.suggest = ns.CreateOutline(button, button, PINK)
 	m.suggest:Hide()
@@ -97,19 +88,19 @@ end
 
 local function updateButton(button)
 	local m = button.AutoVendorMarkers or setUp(button)
-	local protected, marked, suggested = false, false, false
+	local mark, suggested = nil, false
 	if button:IsShown() then
 		local bag, slot = slotOf(button)
 		local info = bag and C_Container.GetContainerItemInfo(bag, slot)
 		if info and info.itemID then
-			protected = ns.isProtected(info.itemID)
-			marked = ns.isMarkedToSell(info.itemID)
+			mark = ns.MarkOf(info.itemID)
 			local s = ns.GetDeleteSuggestion and ns.GetDeleteSuggestion()
 			suggested = s ~= nil and s.bag == bag and s.slot == slot
 		end
 	end
-	setShown(m.protect, protected)
-	setShown(m.sell, marked)
+	for _, kind in ipairs({ "protectOnce", "whitelist", "sellOnce", "blacklist" }) do
+		setShown(m[kind], mark == kind)
+	end
 	setShown(m.suggest, suggested)
 end
 
@@ -139,11 +130,16 @@ local function addTooltipLines(tooltip, bag, slot)
 	local info = C_Container.GetContainerItemInfo(bag, slot)
 	if not (info and info.itemID) then return end
 	local added = false
-	if ns.isProtected(info.itemID) then
-		tooltip:AddLine("AutoVendor: protected", RED[1], RED[2], RED[3])
-		added = true
-	elseif ns.isMarkedToSell(info.itemID) then
-		tooltip:AddLine("AutoVendor: marked to sell", GOLD[1], GOLD[2], GOLD[3])
+	local mark = ns.MarkOf(info.itemID)
+	local text = ({
+		whitelist = "AutoVendor: whitelist - never sold",
+		protectOnce = "AutoVendor: protected (this time)",
+		blacklist = "AutoVendor: blacklist - always sold",
+		sellOnce = "AutoVendor: will be sold (this time)",
+	})[mark]
+	if text then
+		local c = (mark == "whitelist" or mark == "protectOnce") and RED or GOLD
+		tooltip:AddLine(text, c[1], c[2], c[3])
 		added = true
 	end
 	local s = ns.GetDeleteSuggestion and ns.GetDeleteSuggestion()

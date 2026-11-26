@@ -2,9 +2,11 @@
 
 A small World of Warcraft addon (WoW Forever client).
 
-- **Sells gray items** (and items you marked) automatically whenever you open a vendor, then **repairs** your gear with your own gold.
-- **Mark items to sell:** Alt+left-click an item in your bags (again to unmark). It gets a gold coin and is sold along with the grays at the next vendor.
-- **Protect items:** Alt+right-click an item in your bags (again to unprotect). Protected items are never sold or suggested for deletion, get a red outline, and say so in their tooltip.
+- **Sells gray items** (and everything on your blacklist) automatically whenever you open a vendor, then **repairs** your gear with your own gold.
+- **One-time marks (Alt+click in your bags):** Alt+left-click = sell this at the next vendor (gold coin); Alt+right-click = protect this (red dotted outline). Again to unmark. It covers the copies you're carrying now; once you no longer have any, the mark is gone and the next one you pick up is treated normally.
+- **Permanent lists (Ctrl+Alt+click in your bags):** Ctrl+Alt+left-click = **blacklist** (always sold, whatever its quality); Ctrl+Alt+right-click = **whitelist** (never sold or suggested for deletion) - every time the item is in your bags. Again to take it off. Saved by item type, for all your characters.
+  - Both lists are also in the settings window (`/av`): see everything on them, remove items with the X, and add items you aren't carrying by typing an item ID or name, Shift+clicking an item link, or dropping an item on the list. (`/av sell [item]` and `/av protect [item]` also add/remove.)
+- **Markers:** protect once = red dotted outline + X; whitelist = red solid outline + X; sell once = gold coin; blacklist = gold coin + solid gold outline. The tooltip says which, too.
   - Sell one to a vendor by hand anyway and it's bought straight back; put one in a trade window and it's taken straight back out - with a raid-warning-style popup and sound (only you see it). (The game doesn't let addons block a sale or trade, so this is an instant undo.)
 - Both work in the default bags and in [Baganator](https://www.curseforge.com/wow/addons/baganator); with any other bag addon type `/av sell` or `/av protect` and Shift+click the item. Marks are per item type and shared by all your characters.
 - **Combine stacks:** when your normal bags fill up, partial stacks of the same item are merged first (including into a partial stack in your quiver or a profession bag), if that frees a slot.

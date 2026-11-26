@@ -1,10 +1,11 @@
 ## Interface: 16001
 ## Interface-Camelot: 16001
 ## Title: AutoVendor
-## Notes: Sells gray and marked items and repairs gear at vendors. Suggests what to delete when your bags are full. Alt+click marks an item to sell, Alt+right-click protects it.
+## Notes: Sells grays and your blacklist, repairs, and guards your whitelist at vendors. Suggests what to delete when bags are full. Alt+click = once, Ctrl+Alt+click = always.
 ## Author: Korcraft
-## Version: 1.1.2
+## Version: 1.2.0
 ## SavedVariables: AutoVendorDB
+## SavedVariablesPerCharacter: AutoVendorCharDB
 ## OptionalDeps: Baganator
 
 Markers.lua
@@ -12,6 +13,7 @@ AutoVendor.lua
 BagSpace.lua
 DefaultBags.lua
 Conflicts.lua
+Lists.lua
 Settings.lua
 SpecialBags.lua
 Guard.lua

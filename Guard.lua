@@ -5,7 +5,7 @@
 --   * Put a protected item in the trade window? It's taken straight back
 --     out (items in a trade never leave your bag, they're only locked).
 -- To sell or trade a protected item on purpose, unprotect it first
--- (Alt+right-click).
+-- (Alt+right-click, or Ctrl+Alt+right-click to take it off the whitelist).
 --
 -- /av guardtest opens a copyable window showing whether the game functions
 -- this relies on exist on this client, plus the current buyback list.
@@ -66,7 +66,7 @@ local function checkBuyback()
 				BuybackItem(i)
 				warn("PROTECTED ITEM SOLD - " .. link .. " bought back")
 				print(ns.PREFIX .. link .. " is protected - bought it back. "
-					.. "Alt+right-click it to unprotect if you meant to sell it.")
+					.. "To sell it on purpose, Alt+right-click it, or Ctrl+Alt+right-click if it is whitelisted.")
 				-- One per update: indexes shift; the next MERCHANT_UPDATE continues.
 				-- The entry counts as known now, so a buyback that didn't go
 				-- through is never retried (or repeated on a shifted index).
@@ -91,7 +91,7 @@ local function checkTradeSlot(slot)
 	if GetCursorInfo() then ClearCursor() end -- ...and returns it to its bag slot
 	warn("PROTECTED ITEM - " .. link .. " taken out of the trade")
 	print(ns.PREFIX .. link .. " is protected - took it out of the trade. "
-		.. "Alt+right-click it to unprotect if you meant to trade it.")
+		.. "To trade it on purpose, Alt+right-click it, or Ctrl+Alt+right-click if it is whitelisted.")
 end
 
 -- ---------------------------------------------------------------------------

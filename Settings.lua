@@ -9,7 +9,8 @@ local _, ns = ...
 
 local ICON = "Interface\\Icons\\INV_Misc_Coin_01"
 local ROW_SPACING = 30
-local WIDTH = 340
+local WIDTH = 520
+local LISTS_WIDTH = WIDTH - 40
 
 -- Huntard owns ammo buying; this switch just flips Huntard's own setting.
 -- Only on a hunter: Huntard switches itself off on other classes.
@@ -27,21 +28,21 @@ end
 
 local OPTIONS = {
 	{ label = "Sell gray items at vendors", option = setting("sellGrays"),
-		help = "Sells every gray item when you open a vendor. Protected items (Alt+right-click) are never sold." },
-	{ label = "Sell items I marked (Alt+left-click)", option = setting("sellMarked"),
-		help = "Alt+left-click an item in your bags to mark it to sell (gold coin). Marked items are sold "
-			.. "along with the grays when you open a vendor." },
+		help = "Sells every gray item when you open a vendor. Whitelisted items are never sold." },
+	{ label = "Sell blacklisted and Alt+clicked items", option = setting("sellMarked"),
+		help = "Sells everything on your blacklist (below), and anything you Alt+left-clicked in your bags "
+			.. "(gold coin, this time only), along with the grays when you open a vendor, whatever its quality." },
 	{ label = "Repair gear at vendors", option = setting("repair"),
 		help = "Repairs all your gear with your own gold (never guild funds) when the vendor can repair." },
 	{ label = "Suggest what to delete when bags are full", option = setting("bagSpace"),
 		help = "Names the least valuable item when your bags fill up, and outlines it in pink. Never deletes anything.",
 		after = function() if ns.RescanBagSpace then ns.RescanBagSpace() end end },
-	{ label = "Buy back protected items sold by mistake", option = setting("guardSales"),
-		help = "If you sell a protected item to a vendor by hand, it's bought straight back. "
-			.. "Unprotect it first (Alt+right-click) to sell it on purpose." },
-	{ label = "Take protected items out of trades", option = setting("guardTrades"),
-		help = "If you put a protected item in the trade window, it's taken straight back out. "
-			.. "Unprotect it first (Alt+right-click) to trade it on purpose." },
+	{ label = "Buy back whitelisted items sold by mistake", option = setting("guardSales"),
+		help = "If you sell a whitelisted item to a vendor by hand, it's bought straight back. "
+			.. "Take it off the whitelist first to sell it on purpose." },
+	{ label = "Take whitelisted items out of trades", option = setting("guardTrades"),
+		help = "If you put a whitelisted item in the trade window, it's taken straight back out. "
+			.. "Take it off the whitelist first to trade it on purpose." },
 	{ label = "Combine partial stacks when bags are full", option = setting("mergeStacks"),
 		help = "When your normal bags fill up, merges partial stacks of the same item (including into a "
 			.. "partial stack in your quiver or a profession bag) when that frees a slot." },
@@ -80,7 +81,8 @@ end
 
 local function buildPage(container, x, y)
 	container.boxes = {}
-	for i, o in ipairs(visibleOptions()) do
+	local options = visibleOptions()
+	for i, o in ipairs(options) do
 		local box = CreateFrame("CheckButton", nil, container, "UICheckButtonTemplate")
 		box:SetPoint("TOPLEFT", x, y - (i - 1) * ROW_SPACING)
 		box.Text:SetText(o.label)
@@ -99,6 +101,7 @@ local function buildPage(container, x, y)
 		box:SetScript("OnLeave", function() GameTooltip:Hide() end)
 		container.boxes[o] = box
 	end
+	ns.BuildLists(container, x + 6, y - #options * ROW_SPACING - 12, LISTS_WIDTH)
 	container:HookScript("OnShow", sync)
 	pages[#pages + 1] = container
 end
@@ -106,7 +109,7 @@ end
 -- Blizzard's standard window style (portrait, title bar, inset).
 local function createWindow()
 	window = CreateFrame("Frame", "AutoVendorSettings", UIParent, "ButtonFrameTemplate")
-	window:SetSize(WIDTH, 110 + #visibleOptions() * ROW_SPACING)
+	window:SetSize(WIDTH, 120 + #visibleOptions() * ROW_SPACING + ns.LISTS_HEIGHT)
 	window:SetTitle("AutoVendor")
 	window:SetPortraitToAsset(ICON)
 	window:SetPoint("CENTER")
