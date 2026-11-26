@@ -1,11 +1,13 @@
--- Lists: the whitelist and blacklist panels on the settings page.
+-- Lists: the whitelist, blacklist and bank list panels on the settings page.
 --   Whitelist (AutoVendorDB.protected) = never sold, never suggested for
 --     deletion, bought back / pulled out of trades if sold or traded by hand.
 --   Blacklist (AutoVendorDB.sell)      = sold at every vendor, gray or not.
+--   Bank list (AutoVendorDB.bank)      = put in the bank whenever it opens.
 -- Permanent: saved by item type, for all your characters, until you take an
--- item off. Ctrl+Alt+click in your bags changes them too. (Plain Alt+click is a separate one-time mark on just that stack.) Add an item
--- by typing its ID or name, Shift+clicking an item link, or dropping an item
--- on the panel.
+-- item off. Ctrl+Alt+click / Shift+Alt+left-click in your bags changes them
+-- too. (Plain Alt+click and Shift+Alt+right-click are separate one-time marks
+-- on just that stack.) Add an item by typing its ID or name, Shift+clicking an
+-- item link, or dropping an item on the panel.
 
 local _, ns = ...
 
@@ -21,6 +23,8 @@ local LISTS = {
 		hint = "Or Ctrl+Alt+right-click it in your bags." },
 	{ key = "sell", title = "Blacklist - always sell", colorKey = "blacklist",
 		hint = "Or Ctrl+Alt+left-click it in your bags." },
+	{ key = "bank", title = "Bank list - always bank", colorKey = "bankList",
+		hint = "Or Shift+Alt+left-click it in your bags." },
 }
 
 local columns = {}   -- every list column built, on every page
@@ -177,7 +181,7 @@ local function buildColumn(container, spec, x, y, width)
 	box.column = column
 	local placeholder = box:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	placeholder:SetPoint("LEFT", 2, 0)
-	placeholder:SetText("Item ID, name or Shift+click")
+	placeholder:SetText("ID, name or Shift+click")
 	local function updatePlaceholder()
 		placeholder:SetShown(box:GetText() == "" and not box:HasFocus())
 	end
@@ -235,10 +239,10 @@ local function buildColumn(container, spec, x, y, width)
 	return column
 end
 
--- Builds both lists side by side at x, y in `container`, `width` wide in all.
+-- Builds the lists side by side at x, y in `container`, `width` wide in all.
 function ns.BuildLists(container, x, y, width)
 	local gap = 16
-	local colWidth = math.floor((width - gap) / 2)
+	local colWidth = math.floor((width - gap * (#LISTS - 1)) / #LISTS)
 	for i, spec in ipairs(LISTS) do
 		buildColumn(container, spec, x + (i - 1) * (colWidth + gap), y, colWidth)
 	end

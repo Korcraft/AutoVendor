@@ -68,11 +68,15 @@ local function setUp(button)
 		whitelist = ns.CreateProtectMarker(button, button, true),
 		sellOnce = ns.CreateSellMarker(button, button, false),
 		blacklist = ns.CreateSellMarker(button, button, true),
+		bankOnce = ns.CreateBankMarker(button, button, false),
+		bankList = ns.CreateBankMarker(button, button, true),
 	}
 	m.protectOnce:Hide()
 	m.whitelist:Hide()
 	m.sellOnce:Hide()
 	m.blacklist:Hide()
+	m.bankOnce:Hide()
+	m.bankList:Hide()
 
 	m.suggest = ns.CreateOutline(button, button, "suggest")
 	m.suggest:Hide()
@@ -94,7 +98,7 @@ local function updateButton(button)
 			suggested = s ~= nil and s.bag == bag and s.slot == slot
 		end
 	end
-	for _, kind in ipairs({ "protectOnce", "whitelist", "sellOnce", "blacklist" }) do
+	for _, kind in ipairs({ "protectOnce", "whitelist", "sellOnce", "blacklist", "bankOnce", "bankList" }) do
 		setShown(m[kind], mark == kind)
 	end
 	setShown(m.suggest, suggested)
@@ -132,6 +136,8 @@ local function addTooltipLines(tooltip, bag, slot)
 		protectOnce = "AutoVendor: protected (this stack)",
 		blacklist = "AutoVendor: blacklist - always sold",
 		sellOnce = "AutoVendor: will be sold (this stack)",
+		bankList = "AutoVendor: bank list - always banked",
+		bankOnce = "AutoVendor: goes in the bank (this stack)",
 	})[mark]
 	if text then
 		local c = ns.MarkerColor(mark)

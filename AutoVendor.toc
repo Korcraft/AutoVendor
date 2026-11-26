@@ -1,9 +1,9 @@
 ## Interface: 16001
 ## Interface-Camelot: 16001
 ## Title: AutoVendor
-## Notes: Sells grays and your blacklist, repairs, and guards your whitelist at vendors. Suggests what to delete when bags are full. Alt+click = this stack once, Ctrl+Alt+click = always.
+## Notes: Sells grays and your blacklist, repairs, and guards your whitelist at vendors. Suggests what to delete when bags are full. Alt+click = this stack once, Ctrl+Alt+click = always, Shift+Alt+click = bank.
 ## Author: Korcraft
-## Version: 1.4.1
+## Version: 1.5.0
 ## SavedVariables: AutoVendorDB
 ## SavedVariablesPerCharacter: AutoVendorCharDB
 ## OptionalDeps: Baganator

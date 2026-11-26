@@ -119,6 +119,7 @@ local function describe(bag, slot, info)
 	e.maxStack = maxStack or 1
 
 	if ns.isProtected(info.itemID, bag, slot) then e.skip = "protected / whitelist"
+	elseif ns.isBankMarked(info.itemID, bag, slot) then e.skip = "going to the bank"
 	elseif TOOLS[info.itemID] then e.skip = "tool"
 	elseif isQuestItem(bag, slot, classID) then e.skip = "quest item"
 	elseif classID == CLASS_KEY then e.skip = "key"
@@ -300,7 +301,9 @@ local function rescan()
 		-- free anything. Once on, it stays on until the bags close.
 		deleteMode = true
 	end
-	candidate = (deleteMode and ns.BagSpaceEnabled()) and ranked[1] or nil
+	-- "Always show" (off by default): a suggestion whenever your bags are open, full or not.
+	local always = bagOpen and AutoVendorDB and AutoVendorDB.settings and AutoVendorDB.settings.alwaysSuggest
+	candidate = ((deleteMode or always) and ns.BagSpaceEnabled()) and ranked[1] or nil
 	local wasFree = freeSlots
 	freeSlots = free
 	if keyOf(candidate) ~= old then ns.RefreshVisuals() end
@@ -332,7 +335,8 @@ local function deleteEntry(e)
 		return
 	end
 	local info = C_Container.GetContainerItemInfo(e.bag, e.slot)
-	if not (info and info.itemID == e.itemID) or info.isLocked or ns.isProtected(e.itemID, e.bag, e.slot) then
+	if not (info and info.itemID == e.itemID) or info.isLocked or ns.isProtected(e.itemID, e.bag, e.slot)
+		or ns.isBankMarked(e.itemID, e.bag, e.slot) then
 		rescan()
 		return
 	end
@@ -382,8 +386,8 @@ local function createDeleteButton()
 	b:SetText("Delete")
 	-- The item's icon, outlined like its slot in the bag (same colour setting).
 	local iconFrame = CreateFrame("Frame", nil, b)
-	iconFrame:SetSize(22, 22)
-	iconFrame:SetPoint("RIGHT", b, "LEFT", -6, 0)
+	iconFrame:SetSize(32, 32)
+	iconFrame:SetPoint("RIGHT", b, "LEFT", -10, 0)
 	b.icon = iconFrame:CreateTexture(nil, "ARTWORK")
 	b.icon:SetAllPoints()
 	ns.CreateOutline(iconFrame, iconFrame, "suggest")
@@ -640,6 +644,6 @@ SlashCmdList.AUTOVENDOR = function(msg)
 		print(ns.PREFIX .. "/av space - show what to delete when your bags are full.")
 		print(ns.PREFIX .. "/av sell [item] - add to or remove from your blacklist (always sold).")
 		print(ns.PREFIX .. "/av protect [item] - add to or remove from your whitelist (never sold).")
-		print(ns.PREFIX .. "In your bags: Alt+left/right-click = sell/protect that stack only; Ctrl+Alt+left/right-click = blacklist/whitelist.")
+		print(ns.PREFIX .. "In your bags: Alt+left/right-click = sell/protect that stack only; Ctrl+Alt+left/right-click = blacklist/whitelist; Shift+Alt+left/right-click = bank list/bank that stack once.")
 	end
 end

@@ -6,8 +6,10 @@
 --   whitelist   (Ctrl+Alt+right-click)   red solid outline + X
 --   sell once   (Alt+left-click)         gold dotted outline + coin
 --   blacklist   (Ctrl+Alt+left-click)    gold solid outline + coin
+--   bank once   (Shift+Alt+right-click)  blue dotted outline + bank icon
+--   bank list   (Shift+Alt+left-click)   blue solid outline + bank icon
 --   delete suggestion                    hot pink dotted outline
--- Each of the five outline colours can be changed in /av (AutoVendorDB.colors);
+-- Each of the outline colours can be changed in /av (AutoVendorDB.colors);
 -- markers already drawn pick up a change straight away.
 
 local _, ns = ...
@@ -15,12 +17,14 @@ local _, ns = ...
 local DASH, GAP, THICKNESS = 4, 3, 2
 local GLOW_SCALE = 1.75 -- the glow texture's bright ring sits well inside its edges
 
-ns.MARKER_COLORS = { -- in the order the settings page shows them
+ns.MARKER_COLORS = { -- in the order the settings page shows them, 3 per row
 	{ key = "whitelist", label = "Whitelist", default = { 0.9, 0.1, 0.1 } },
-	{ key = "protectOnce", label = "Protect once", default = { 0.9, 0.1, 0.1 } },
-	{ key = "suggest", label = "Delete suggestion", default = { 1, 0.2, 0.6 } },
 	{ key = "blacklist", label = "Blacklist", default = { 1, 0.82, 0 } },
+	{ key = "bankList", label = "Bank list", default = { 0.25, 0.6, 1 } },
+	{ key = "protectOnce", label = "Protect once", default = { 0.9, 0.1, 0.1 } },
 	{ key = "sellOnce", label = "Sell once", default = { 1, 0.82, 0 } },
+	{ key = "bankOnce", label = "Bank once", default = { 0.25, 0.6, 1 } },
+	{ key = "suggest", label = "Delete suggestion", default = { 1, 0.2, 0.6 } },
 }
 local DEFAULT_COLOR = {}
 for _, c in ipairs(ns.MARKER_COLORS) do DEFAULT_COLOR[c.key] = c.default end
@@ -134,4 +138,17 @@ function ns.CreateSellMarker(parent, anchorTo, solid)
 	coin:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
 	ns.CreateOutline(coinFrame, anchorTo, solid and "blacklist" or "sellOnce", solid)
 	return coinFrame
+end
+
+-- Bank marker: the banker icon in the corner plus an outline (solid = bank list).
+function ns.CreateBankMarker(parent, anchorTo, solid)
+	local iconFrame = CreateFrame("Frame", nil, parent)
+	iconFrame:SetSize(15, 15)
+	iconFrame:SetPoint("TOPLEFT", anchorTo, "TOPLEFT", 1, -1)
+	iconFrame:SetFrameLevel(anchorTo:GetFrameLevel() + 3)
+	local icon = iconFrame:CreateTexture(nil, "OVERLAY", nil, 7)
+	icon:SetAllPoints()
+	icon:SetTexture("Interface\\Minimap\\Tracking\\Banker")
+	ns.CreateOutline(iconFrame, anchorTo, solid and "bankList" or "bankOnce", solid)
+	return iconFrame
 end

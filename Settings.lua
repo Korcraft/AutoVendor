@@ -9,7 +9,7 @@ local _, ns = ...
 
 local ICON = "Interface\\Icons\\INV_Misc_Coin_01"
 local ROW_SPACING = 30
-local WIDTH = 520
+local WIDTH = 640
 local LISTS_WIDTH = WIDTH - 40
 
 -- Huntard owns ammo buying; this switch just flips Huntard's own setting.
@@ -32,10 +32,18 @@ local OPTIONS = {
 	{ label = "Sell blacklisted and Alt+clicked items", option = setting("sellMarked"),
 		help = "Sells everything on your blacklist (below), and anything you Alt+left-clicked in your bags "
 			.. "(gold coin, that stack only), along with the grays when you open a vendor, whatever its quality." },
+	{ label = "Put bank-listed items in the bank", option = setting("bankMarked"),
+		help = "When you open your bank, moves everything on your bank list (Shift+Alt+left-click) and every "
+			.. "stack you marked with Shift+Alt+right-click (that stack only) into the bank. "
+			.. "Bank-marked items are never sold or suggested for deletion." },
 	{ label = "Repair gear at vendors", option = setting("repair"),
 		help = "Repairs all your gear with your own gold (never guild funds) when the vendor can repair." },
 	{ label = "Suggest what to delete when bags are full", option = setting("bagSpace"),
 		help = "Names the least valuable item when your bags fill up, and outlines it in pink. Never deletes anything.",
+		after = function() if ns.RescanBagSpace then ns.RescanBagSpace() end end },
+	{ label = "Always show the delete suggestion, even when bags aren't full", option = setting("alwaysSuggest"),
+		help = "Outlines the least valuable item (and shows the Delete button) whenever your bags are open, "
+			.. "not only when they're full. Off by default.",
 		after = function() if ns.RescanBagSpace then ns.RescanBagSpace() end end },
 	{ label = "Show a Delete button beside your bags", option = setting("deleteButton"),
 		help = "While an item is outlined in pink, a Delete button sits beside your open bags. Each click deletes "
@@ -67,7 +75,7 @@ local OPTIONS = {
 -- button that puts them all back. See Markers.lua.
 -- ---------------------------------------------------------------------------
 
-local COLORS_HEIGHT = 92 -- header + two rows of swatches
+local COLORS_HEIGHT = 120 -- header + three rows of swatches
 local swatches = {}
 
 local function syncSwatches()
@@ -151,7 +159,8 @@ local function buildColors(container, x, y, width)
 
 	local reset = CreateFrame("Button", nil, container, "UIPanelButtonTemplate")
 	reset:SetSize(120, 22)
-	reset:SetPoint("TOPLEFT", x + 2 * columnWidth, y - 22 - 28 - 1)
+	local cell = #ns.MARKER_COLORS -- the first free cell after the swatches
+	reset:SetPoint("TOPLEFT", x + (cell % 3) * columnWidth, y - 22 - math.floor(cell / 3) * 28 - 1)
 	reset:SetText("Reset colours")
 	reset:SetScript("OnClick", function()
 		for _, c in ipairs(ns.MARKER_COLORS) do ns.SetMarkerColor(c.key, nil) end

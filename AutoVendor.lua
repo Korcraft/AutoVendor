@@ -1,20 +1,21 @@
 -- AutoVendor: whenever a merchant opens, sells every gray item and every item
 -- you marked to sell, then repairs all gear with your own gold if this
 -- merchant can repair. Selling goes first so the sale money can help pay for
--- the repair.
+-- the repair. When the bank opens, puts everything marked for the bank in it.
 --
--- Two kinds of marks:
---   * One-time, with Alt+click in your bags (default bags or Baganator):
---       Alt+left-click  = sell this (gold coin). Again to unmark.
---       Alt+right-click = protect this (red dotted outline + X). Again to unmark.
---     It covers the copies of that item you're carrying now. Once you no
---     longer have any (sold, deleted, banked...), the mark is gone, and the
---     next one you pick up is treated normally.
---   * Permanent lists, Ctrl+Alt+left/right-click in your bags, the lists in /av (Lists.lua), or /av sell|protect [item]:
---       blacklist (AutoVendorDB.sell)      = always sold, every time you have it
---       whitelist (AutoVendorDB.protected) = never sold, every time you have it
---     By item type, for all your characters, until you take it off.
--- An item is never both sold and protected: marking it one way clears the other.
+-- Two kinds of marks, in your bags (default bags or Baganator):
+--   * One-time, on the one stack you click (other stacks are left alone):
+--       Alt+left-click        = sell this stack (gold dotted outline + coin)
+--       Alt+right-click       = protect this stack (red dotted outline + X)
+--       Shift+Alt+right-click = bank this stack (blue dotted outline + bank icon)
+--     Again to unmark. Once the stack is gone (sold, deleted, banked...), the
+--     mark is gone too.
+--   * Permanent lists, by item type, for all your characters, until you take
+--     it off (also in the lists in /av (Lists.lua), or /av sell|protect [item]):
+--       Ctrl+Alt+left-click   = blacklist (AutoVendorDB.sell): always sold
+--       Ctrl+Alt+right-click  = whitelist (AutoVendorDB.protected): never sold
+--       Shift+Alt+left-click  = bank list (AutoVendorDB.bank): always banked
+-- An item only ever has one mark: setting one clears the others.
 
 local _, ns = ...
 
@@ -96,11 +97,22 @@ local function markOf(itemID, bag, slot)
 	if not (itemID and db) then return nil end
 	if db.protected[itemID] then return "whitelist" end
 	if db.sell[itemID] then return "blacklist" end
+	if db.bank and db.bank[itemID] then return "bankList" end
 	local m = onceMarkAt(bag, slot, itemID)
-	if m then return m.kind == "sell" and "sellOnce" or "protectOnce" end
+	if m then
+		return (m.kind == "sell" and "sellOnce") or (m.kind == "bank" and "bankOnce") or "protectOnce"
+	end
 	return nil
 end
 ns.MarkOf = markOf
+
+-- Bank list or one-time bank: put in the bank when you open it, and never
+-- sold or suggested for deletion meanwhile.
+local function isBankMarked(itemID, bag, slot)
+	local m = markOf(itemID, bag, slot)
+	return m == "bankList" or m == "bankOnce"
+end
+ns.isBankMarked = isBankMarked
 
 local function isProtected(itemID, bag, slot)
 	local m = markOf(itemID, bag, slot)
@@ -194,6 +206,7 @@ local function clearReprotect() reprotect = {} end
 
 local function shouldSell(info, bag, slot)
 	if not info or info.hasNoValue or isProtected(info.itemID, bag, slot) then return false end
+	if isBankMarked(info.itemID, bag, slot) then return false end
 	local s = AutoVendorDB.settings
 	return (s.sellGrays and info.quality == QUALITY_POOR)
 		or (s.sellMarked and isMarkedToSell(info.itemID, bag, slot))
@@ -288,15 +301,31 @@ local function labelOf(itemID, itemLink)
 	return (getInfo and select(2, getInfo(itemID))) or ("item " .. itemID)
 end
 
--- One-time marks (Alt+click) on the one stack in `bag`/`slot`. `kind` is
--- "sell" or "protected".
+local LIST_NAMES = { whitelist = "whitelist", blacklist = "blacklist", bankList = "bank list" }
+local LIST_CLICKS = {
+	whitelist = "Ctrl+Alt+right-click", blacklist = "Ctrl+Alt+left-click", bankList = "Shift+Alt+left-click",
+}
+local ONCE_ON = {
+	sell = " (this stack) will be sold at the next vendor. Ctrl+Alt+left-click to always sell every one.",
+	protected = " (this stack) is protected. Ctrl+Alt+right-click to always keep every one.",
+	bank = " (this stack) goes in the bank next time you open it. Shift+Alt+left-click to always bank every one.",
+}
+local ONCE_OFF = {
+	sell = " is no longer marked to sell.",
+	protected = " is no longer protected.",
+	bank = " is no longer marked for the bank.",
+}
+
+-- One-time marks on the one stack in `bag`/`slot`. `kind` is "sell",
+-- "protected" or "bank".
 local function toggleOnce(kind, itemID, itemLink, bag, slot)
 	if not AutoVendorDB then return end
 	local label = labelOf(itemID, itemLink)
 	local m = markOf(itemID)
-	-- A permanent list entry is changed with Ctrl+Alt+click or in /av, not with a one-time click.
-	if m == "whitelist" or m == "blacklist" then
-		print(PREFIX .. label .. " is on your " .. m .. ". Ctrl+Alt+click it (or use /av) to take it off first.")
+	-- A permanent list entry is changed with its own click or in /av, not with a one-time click.
+	if LIST_NAMES[m] then
+		print(PREFIX .. label .. " is on your " .. LIST_NAMES[m] .. ". " .. LIST_CLICKS[m]
+			.. " it (or use /av) to take it off first.")
 		afterMarkChange()
 		return
 	end
@@ -309,18 +338,16 @@ local function toggleOnce(kind, itemID, itemLink, bag, slot)
 	local current = onceMarkAt(bag, slot, itemID)
 	if current and current.kind == kind then
 		AutoVendorCharDB.once[key] = nil
-		print(PREFIX .. label .. (kind == "sell" and " is no longer marked to sell." or " is no longer protected."))
+		print(PREFIX .. label .. ONCE_OFF[kind])
 	else
 		AutoVendorCharDB.once[key] = { kind = kind, itemID = itemID }
-		print(PREFIX .. label .. (kind == "sell"
-			and " (this stack) will be sold at the next vendor. Ctrl+Alt+left-click to always sell every one."
-			or " (this stack) is protected. Ctrl+Alt+right-click to always keep every one."))
+		print(PREFIX .. label .. ONCE_ON[kind])
 	end
 	afterMarkChange()
 end
 
--- Permanent lists: puts an item on the whitelist or blacklist, or off it if
--- it's already there. Used by /av protect|sell [item].
+-- Permanent lists: puts an item on the whitelist, blacklist or bank list, or
+-- off it if it's already there. Used by the clicks and /av protect|sell [item].
 local function togglePermanent(list, itemID, itemLink)
 	if not AutoVendorDB then return end
 	if AutoVendorDB[list][itemID] then
@@ -333,8 +360,9 @@ ns.ToggleProtected = function(itemID, itemLink) togglePermanent("protected", ite
 ns.ToggleSell = function(itemID, itemLink) togglePermanent("sell", itemID, itemLink) end
 
 -- Puts an item on one permanent list ("protected" = whitelist, "sell" =
--- blacklist), or takes it off both when `list` is nil. Used by the list panels.
--- Any one-time marks on stacks of it go too: the list decides for all of them now.
+-- blacklist, "bank" = bank list), or takes it off all of them when `list` is
+-- nil. Used by the list panels. Any one-time marks on stacks of it go too:
+-- the list decides for all of them now.
 function ns.SetListed(itemID, list, itemLink)
 	if not (AutoVendorDB and itemID) then return end
 	local label = labelOf(itemID, itemLink)
@@ -343,12 +371,17 @@ function ns.SetListed(itemID, list, itemLink)
 	end
 	AutoVendorDB.protected[itemID] = nil
 	AutoVendorDB.sell[itemID] = nil
+	AutoVendorDB.bank[itemID] = nil
 	if list == "protected" then
 		AutoVendorDB.protected[itemID] = true
 		print(PREFIX .. label .. " is on your whitelist: never sold or suggested for deletion.")
 	elseif list == "sell" then
 		AutoVendorDB.sell[itemID] = true
 		print(PREFIX .. label .. " is on your blacklist: sold at every vendor.")
+	elseif list == "bank" then
+		AutoVendorDB.bank[itemID] = true
+		print(PREFIX .. label .. " is on your bank list: put in the bank whenever you open it, "
+			.. "never sold or suggested for deletion.")
 	else
 		print(PREFIX .. label .. " is off your lists.")
 	end
@@ -382,13 +415,14 @@ end
 -- The one place that decides what a modified click on a bag item means, so
 -- every bag UI behaves the same. Returns true if the click was ours. `bag`
 -- and `slot` say which stack a one-time mark goes on.
--- Ctrl+click on an item opens the dressing room, and the game does that before
--- our click hook runs. So each dressing room window notes when it opened, and a
--- Ctrl+Alt+click closes one that opened on that same click. (One you already
--- had open stays open.)
+-- Ctrl+click on an item opens the dressing room and Shift+click on a stack
+-- opens the split-stack box, and the game does that before our click hook
+-- runs. So each of those windows notes when it opened, and our modified
+-- clicks close one that opened on that same click. (One you already had open
+-- stays open.)
 local dressUpShownAt = {}
 local function watchDressUp()
-	for _, name in ipairs({ "DressUpFrame", "SideDressUpFrame" }) do
+	for _, name in ipairs({ "DressUpFrame", "SideDressUpFrame", "StackSplitFrame" }) do
 		local f = _G[name]
 		if f and not dressUpShownAt[f] then
 			-- Hooked only now and already open: it loaded on this very click.
@@ -410,9 +444,19 @@ end
 function ns.HandleItemClick(mouseButton, itemID, itemLink, bag, slot)
 	if not itemID then return false end
 	local alt, ctrl, shift = IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
-	if not alt or shift then return false end
-	if ctrl then closeDressUpFromThisClick() end
-	-- Alt = one-time mark; Ctrl+Alt = permanent list.
+	if not alt or (shift and ctrl) then return false end
+	if ctrl or shift then closeDressUpFromThisClick() end
+	-- Alt = one-time mark; Ctrl+Alt = permanent list; Shift+Alt = bank.
+	if shift then
+		if mouseButton == "LeftButton" then
+			togglePermanent("bank", itemID, itemLink)
+			return true
+		elseif mouseButton == "RightButton" then
+			toggleOnce("bank", itemID, itemLink, bag, slot)
+			return true
+		end
+		return false
+	end
 	if mouseButton == "LeftButton" then
 		if ctrl then togglePermanent("sell", itemID, itemLink) else toggleOnce("sell", itemID, itemLink, bag, slot) end
 		return true
@@ -466,6 +510,63 @@ local function registerWithBaganator()
 	add("AutoVendor: protected (once)", "autovendor_protected", "protectOnce", ns.CreateProtectMarker, false, 2)
 	add("AutoVendor: blacklist", "autovendor_blacklist", "blacklist", ns.CreateSellMarker, true, 3)
 	add("AutoVendor: sell (once)", "autovendor_sell", "sellOnce", ns.CreateSellMarker, false, 4)
+	add("AutoVendor: bank list", "autovendor_banklist", "bankList", ns.CreateBankMarker, true, 5)
+	add("AutoVendor: bank (once)", "autovendor_bank", "bankOnce", ns.CreateBankMarker, false, 6)
+end
+
+-- ---------------------------------------------------------------------------
+-- Bank: when it opens, everything on the bank list and every stack marked
+-- for the bank once goes in, a few at a time like selling. Right-clicking a
+-- bag item while the bank is open moves it to the bank -- but would use it
+-- (eat, equip...) if the bank weren't open, so every move checks that first.
+-- ---------------------------------------------------------------------------
+
+local bankOpen = false
+local bankSession = 0
+
+local function bankMarkedLeft()
+	local n = 0
+	for bag = FIRST_BAG, LAST_BAG do
+		for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do
+			local info = C_Container.GetContainerItemInfo(bag, slot)
+			if info and info.itemID and isBankMarked(info.itemID, bag, slot) then n = n + 1 end
+		end
+	end
+	return n
+end
+
+local function bankPass(id, state)
+	if id ~= bankSession or not bankOpen then return end
+	state.passes = state.passes + 1
+	local movedThisPass, moreToDo = 0, false
+	for bag = FIRST_BAG, LAST_BAG do
+		for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do
+			local info = C_Container.GetContainerItemInfo(bag, slot)
+			local key = bag .. ":" .. slot
+			if info and info.itemID and not state.sent[key] and isBankMarked(info.itemID, bag, slot) then
+				if info.isLocked or movedThisPass >= SELL_BATCH then
+					moreToDo = true
+				elseif bankOpen then
+					state.sent[key] = true
+					state.count = state.count + 1
+					movedThisPass = movedThisPass + 1
+					C_Container.UseContainerItem(bag, slot)
+				end
+			end
+		end
+	end
+	if moreToDo and state.passes < MAX_PASSES then
+		C_Timer.After(SELL_DELAY, function() bankPass(id, state) end)
+		return
+	end
+	C_Timer.After(REPAIR_DELAY, function()
+		if id ~= bankSession or state.count == 0 then return end
+		local left = bankMarkedLeft()
+		local moved = math.max(0, state.count - left)
+		local line = PREFIX .. "put " .. moved .. (moved == 1 and " stack" or " stacks") .. " in the bank"
+		if left > 0 then line = line .. "; " .. left .. " didn't fit (bank full?)" end
+		print(line .. ".")
+	end)
 end
 
 -- ---------------------------------------------------------------------------
@@ -476,21 +577,38 @@ events:RegisterEvent("MERCHANT_SHOW")
 events:RegisterEvent("MERCHANT_CLOSED")
 events:RegisterEvent("BAG_UPDATE_DELAYED")
 events:RegisterEvent("TRADE_CLOSED")
+events:RegisterEvent("BANKFRAME_OPENED")
+events:RegisterEvent("BANKFRAME_CLOSED")
 events:SetScript("OnEvent", function(self, event, addonName)
+	if event == "BANKFRAME_OPENED" then
+		bankOpen = true
+		bankSession = bankSession + 1
+		if AutoVendorDB.settings.bankMarked then
+			local id = bankSession
+			-- A moment for the bank's contents to arrive first.
+			C_Timer.After(0.3, function() bankPass(id, { sent = {}, count = 0, passes = 0 }) end)
+		end
+		return
+	elseif event == "BANKFRAME_CLOSED" then
+		bankOpen = false
+		bankSession = bankSession + 1
+		return
+	end
 	if event == "ADDON_LOADED" then
 		if addonName ~= "AutoVendor" then return end
 		self:UnregisterEvent("ADDON_LOADED")
 		AutoVendorDB = AutoVendorDB or {}
 		AutoVendorDB.protected = AutoVendorDB.protected or {}
 		AutoVendorDB.sell = AutoVendorDB.sell or {}
+		AutoVendorDB.bank = AutoVendorDB.bank or {}
 		AutoVendorDB.settings = AutoVendorDB.settings or {}
 		-- One-time marks are about the stacks this character carries, so per
 		-- character. (Before 1.4 they were by item type in .sell/.protected.)
 		AutoVendorCharDB = AutoVendorCharDB or {}
 		AutoVendorCharDB.once = AutoVendorCharDB.once or {}
 		AutoVendorCharDB.sell, AutoVendorCharDB.protected = nil, nil
-		for key, default in pairs({ sellGrays = true, sellMarked = true, repair = true, bagSpace = true, deleteButton = true,
-			moveToSpecialBags = true, mergeStacks = true, guardSales = true, guardTrades = true }) do
+		for key, default in pairs({ sellGrays = true, sellMarked = true, repair = true, bagSpace = true, deleteButton = true, alwaysSuggest = false,
+			moveToSpecialBags = true, mergeStacks = true, guardSales = true, guardTrades = true, bankMarked = true }) do
 			if AutoVendorDB.settings[key] == nil then AutoVendorDB.settings[key] = default end
 		end
 		registerWithBaganator()
