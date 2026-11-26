@@ -1,5 +1,5 @@
--- SpecialBags: the moment your normal bags fill up, tidies them to free as
--- many slots as possible, without deleting anything:
+-- SpecialBags: when your normal bags fill up (or are as full as the /av slider
+-- says, see BagSpace.lua), tidies them to free as many slots as possible, without deleting anything:
 --   1. combines partial stacks of the same item (also into a partial stack in
 --      a quiver or profession bag), and
 --   2. moves anything that belongs in a special bag (ammo into a quiver or
@@ -19,6 +19,30 @@ local CLASS_QUIVER = IC.Quiver or 11
 local getItemFamily = (C_Item and C_Item.GetItemFamily) or _G.GetItemFamily
 local getItemInfoInstant = (C_Item and C_Item.GetItemInfoInstant) or _G.GetItemInfoInstant
 local band = bit and bit.band
+
+-- Items you split by hand are left alone for SPLIT_HOLD seconds, so tidying
+-- never re-merges (or moves) a stack you just split on purpose. Our own
+-- merges split stacks too; those set ownSplit and don't count.
+local SPLIT_HOLD = 120
+local handSplitAt = {} -- itemID -> GetTime() of your last split of it
+local ownSplit = false
+
+local function recentlySplit(itemID)
+	local t = handSplitAt[itemID]
+	return t ~= nil and GetTime() - t < SPLIT_HOLD
+end
+
+local function noteSplit(bag, slot)
+	if ownSplit then return end
+	local info = C_Container.GetContainerItemInfo(bag, slot)
+	if info and info.itemID then handSplitAt[info.itemID] = GetTime() end
+end
+if C_Container and C_Container.SplitContainerItem then
+	hooksecurefunc(C_Container, "SplitContainerItem", noteSplit)
+end
+if type(_G.SplitContainerItem) == "function" and _G.SplitContainerItem ~= (C_Container and C_Container.SplitContainerItem) then
+	hooksecurefunc("SplitContainerItem", noteSplit)
+end
 
 local function enabled()
 	return AutoVendorDB and AutoVendorDB.settings and AutoVendorDB.settings.moveToSpecialBags ~= false
@@ -52,7 +76,8 @@ local function mergeStacks(names, tried)
 		local ordinary = bag == 0 or select(2, C_Container.GetContainerNumFreeSlots(bag)) == 0
 		for slot = 1, C_Container.GetContainerNumSlots(bag) do
 			local info = C_Container.GetContainerItemInfo(bag, slot)
-			if info and info.itemID and not info.isLocked and not ns.HasOnceMark(bag, slot) then
+			if info and info.itemID and not info.isLocked and not ns.HasOnceMark(bag, slot)
+				and not recentlySplit(info.itemID) then
 				local maxStack = select(8, getItemInfo(info.itemID))
 				local count = info.stackCount or 1
 				if maxStack and maxStack > 1 and count < maxStack then
@@ -88,7 +113,9 @@ local function mergeStacks(names, tried)
 				.. ":" .. src.count .. ":" .. dest.count)
 			if key and not tried[key] then
 				tried[key] = true
+				ownSplit = true -- our own split, not one of yours
 				C_Container.SplitContainerItem(src.bag, src.slot, math.min(src.count, dest.room))
+				ownSplit = false
 				C_Container.PickupContainerItem(dest.bag, dest.slot)
 				if GetCursorInfo() then ClearCursor() end -- didn't take: put it back
 				merged = merged + 1
@@ -140,7 +167,8 @@ local function moveToSpecialBags(names, tried)
 		if isOrdinaryBag(bag) then
 			for slot = 1, C_Container.GetContainerNumSlots(bag) do
 				local info = C_Container.GetContainerItemInfo(bag, slot)
-				if info and info.itemID and not info.isLocked and not ns.HasOnceMark(bag, slot) then
+				if info and info.itemID and not info.isLocked and not ns.HasOnceMark(bag, slot)
+					and not recentlySplit(info.itemID) then
 					local _, _, _, _, _, classID = getItemInfoInstant(info.itemID)
 					-- Bags and quivers carry their own family; never move those.
 					local family = (classID ~= CLASS_CONTAINER and classID ~= CLASS_QUIVER)
@@ -185,7 +213,7 @@ local function finish()
 	if #t.merged > 0 then parts[#parts + 1] = "combined stacks of " .. table.concat(t.merged, ", ") end
 	if #t.moved > 0 then parts[#parts + 1] = "moved " .. table.concat(t.moved, ", ") .. " into your special bags" end
 	if #parts > 0 then
-		print(ns.PREFIX .. "Bags full - " .. table.concat(parts, "; ") .. ".")
+		print(ns.PREFIX .. (t.early and "Tidied your bags - " or "Bags full - ") .. table.concat(parts, "; ") .. ".")
 	end
 	if ns.OnTidyDone then ns.OnTidyDone() end
 end
@@ -222,8 +250,8 @@ function ns.IsTidying()
 end
 
 -- Starts tidying; BagSpace calls this the moment the normal bags fill up.
-function ns.StartTidy()
+function ns.StartTidy(early)
 	if tidy then return end
-	tidy = { passes = 0, merged = {}, moved = {}, tried = {} } -- tried: never retry the same move
+	tidy = { passes = 0, merged = {}, moved = {}, tried = {}, early = early } -- tried: never retry the same move
 	ns.TidyStep()
 end

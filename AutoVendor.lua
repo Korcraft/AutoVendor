@@ -607,10 +607,13 @@ events:SetScript("OnEvent", function(self, event, addonName)
 		AutoVendorCharDB = AutoVendorCharDB or {}
 		AutoVendorCharDB.once = AutoVendorCharDB.once or {}
 		AutoVendorCharDB.sell, AutoVendorCharDB.protected = nil, nil
-		for key, default in pairs({ sellGrays = true, sellMarked = true, repair = true, bagSpace = true, deleteButton = true, alwaysSuggest = false,
+		for key, default in pairs({ sellGrays = true, sellMarked = true, repair = true, bagSpace = true, deleteButton = true, suggestAt = 100,
 			moveToSpecialBags = true, mergeStacks = true, guardSales = true, guardTrades = true, bankMarked = true }) do
 			if AutoVendorDB.settings[key] == nil then AutoVendorDB.settings[key] = default end
 		end
+		-- 1.5.0's "always show" switch became the slider's far left.
+		if AutoVendorDB.settings.alwaysSuggest then AutoVendorDB.settings.suggestAt = 0 end
+		AutoVendorDB.settings.alwaysSuggest = nil
 		registerWithBaganator()
 		watchDressUp()
 		return

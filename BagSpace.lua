@@ -291,19 +291,34 @@ local function ordinaryTotalSlots()
 	return total
 end
 
+-- The /av slider: how full (in %) the normal bags must be before deletes are
+-- suggested and stacks tidied. 0 = always, 100 = only when full (the default).
+local function suggestAt()
+	local v = AutoVendorDB and AutoVendorDB.settings and tonumber(AutoVendorDB.settings.suggestAt)
+	return v and math.max(0, math.min(100, v)) or 100
+end
+
+-- True when the normal bags are at least as full as the slider says.
+local function thresholdReached(free)
+	local total = ordinaryTotalSlots()
+	if total == 0 then return false end -- bag data not loaded yet
+	if free == nil then free = ordinaryFreeSlots() end
+	local at = suggestAt()
+	if at >= 100 then return free == 0 end
+	return (total - free) * 100 >= at * total
+end
+
 local function rescan()
 	local ranked, _, free = scan()
 	local old = keyOf(candidate)
 	if not bagOpen then
 		deleteMode = false
-	elseif free == 0 and ordinaryTotalSlots() > 0 and not (ns.IsTidying and ns.IsTidying()) then
-		-- Only starts while the bags are really full, after tidying couldn't
-		-- free anything. Once on, it stays on until the bags close.
+	elseif thresholdReached(free) and not (ns.IsTidying and ns.IsTidying()) then
+		-- Starts once the bags are as full as the slider says (after tidying),
+		-- then stays on until the bags close.
 		deleteMode = true
 	end
-	-- "Always show" (off by default): a suggestion whenever your bags are open, full or not.
-	local always = bagOpen and AutoVendorDB and AutoVendorDB.settings and AutoVendorDB.settings.alwaysSuggest
-	candidate = ((deleteMode or always) and ns.BagSpaceEnabled()) and ranked[1] or nil
+	candidate = (deleteMode and ns.BagSpaceEnabled()) and ranked[1] or nil
 	local wasFree = freeSlots
 	freeSlots = free
 	if keyOf(candidate) ~= old then ns.RefreshVisuals() end
@@ -583,11 +598,68 @@ function ns.OnTidyDone()
 	end
 end
 
+-- ---------------------------------------------------------------------------
+-- Early tidying: with the slider below "Only when full", stacks are combined
+-- and things moved into special bags as soon as the bags are that full. It's
+-- careful not to get in your way: it waits until your bags have been still
+-- for a moment, and never runs while you hold an item, split a stack, are in
+-- combat, or have a vendor, bank, trade or mail window open. Items you split
+-- by hand recently are left alone (SpecialBags.lua).
+-- ---------------------------------------------------------------------------
+
+local QUIET_DELAY = 2 -- seconds of no bag changes before tidying
+local EARLY_COOLDOWN = 10
+local lastEarlyTidy = -math.huge
+local busyWindows = {} -- "bank", "trade", "mail" -> true while open
+local quietToken = 0
+
+local function tidyIsSafe()
+	if GetCursorInfo() then return false end
+	if InCombatLockdown and InCombatLockdown() then return false end
+	if StackSplitFrame and StackSplitFrame:IsShown() then return false end
+	if merchantOpen() or next(busyWindows) then return false end
+	return true
+end
+
+local function scheduleEarlyTidy()
+	quietToken = quietToken + 1
+	local mine = quietToken
+	C_Timer.After(QUIET_DELAY, function()
+		if mine ~= quietToken or not ns.StartTidy or ns.IsTidying() then return end
+		local free = ordinaryFreeSlots()
+		if free == 0 or suggestAt() >= 100 or not thresholdReached(free) then return end
+		if not tidyIsSafe() then
+			scheduleEarlyTidy() -- try again once things are quiet
+			return
+		end
+		-- At most every EARLY_COOLDOWN seconds, so a move the game keeps
+		-- refusing can't make it tidy over and over.
+		local wait = lastEarlyTidy + EARLY_COOLDOWN - GetTime()
+		if wait > 0 then
+			C_Timer.After(wait, scheduleEarlyTidy)
+			return
+		end
+		lastEarlyTidy = GetTime()
+		ns.StartTidy(true)
+	end)
+end
+
+local BUSY_EVENTS = {
+	BANKFRAME_OPENED = { "bank", true }, BANKFRAME_CLOSED = { "bank", nil },
+	TRADE_SHOW = { "trade", true }, TRADE_CLOSED = { "trade", nil },
+	MAIL_SHOW = { "mail", true }, MAIL_CLOSED = { "mail", nil },
+}
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
 events:RegisterEvent("BAG_UPDATE_DELAYED")
 events:RegisterEvent("UI_ERROR_MESSAGE")
+for name in pairs(BUSY_EVENTS) do events:RegisterEvent(name) end
 events:SetScript("OnEvent", function(_, event, _, message)
+	if BUSY_EVENTS[event] then
+		busyWindows[BUSY_EVENTS[event][1]] = BUSY_EVENTS[event][2]
+		return
+	end
 	if event == "PLAYER_LOGIN" then
 		registerWithBaganator()
 		rescan()
@@ -609,6 +681,7 @@ events:SetScript("OnEvent", function(_, event, _, message)
 		end
 		lastOrdinaryFree = free
 		rescan()
+		if free > 0 and suggestAt() < 100 and thresholdReached(free) then scheduleEarlyTidy() end
 	elseif event == "UI_ERROR_MESSAGE" then
 		if message == ERR_INV_FULL and ns.StartTidy and not ns.IsTidying()
 			and GetTime() - lastFullWarning > FULL_ERROR_THROTTLE then

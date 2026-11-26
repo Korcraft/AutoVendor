@@ -38,12 +38,23 @@ local OPTIONS = {
 			.. "Bank-marked items are never sold or suggested for deletion." },
 	{ label = "Repair gear at vendors", option = setting("repair"),
 		help = "Repairs all your gear with your own gold (never guild funds) when the vendor can repair." },
-	{ label = "Suggest what to delete when bags are full", option = setting("bagSpace"),
+	{ label = "Suggest what to delete (from the slider below)", option = setting("bagSpace"),
 		help = "Names the least valuable item when your bags fill up, and outlines it in pink. Never deletes anything.",
 		after = function() if ns.RescanBagSpace then ns.RescanBagSpace() end end },
-	{ label = "Always show the delete suggestion, even when bags aren't full", option = setting("alwaysSuggest"),
-		help = "Outlines the least valuable item (and shows the Delete button) whenever your bags are open, "
-			.. "not only when they're full. Off by default.",
+	{ label = "Suggest deletes and tidy stacks from:", option = setting("suggestAt"),
+		help = "How full your normal bags must be (quivers and profession bags don't count) before AutoVendor "
+			.. "outlines the cheapest item in pink and shows the Delete button (while your bags are open), and "
+			.. "starts combining stacks and moving things into special bags. All the way left = always; all the "
+			.. "way right = only when full. Tidying waits until you've stopped moving things, never runs while "
+			.. "a vendor, bank, trade or mail window is open or in combat, and leaves alone any item you split "
+			.. "by hand in the last 2 minutes.",
+		slider = {
+			min = 0, max = 100, step = 10, leftText = "Always", rightText = "Only when full",
+			describe = function(v)
+				if v <= 0 then return "Always" elseif v >= 100 then return "Only when full" end
+				return v .. "% full"
+			end,
+		},
 		after = function() if ns.RescanBagSpace then ns.RescanBagSpace() end end },
 	{ label = "Show a Delete button beside your bags", option = setting("deleteButton"),
 		help = "While an item is outlined in pink, a Delete button sits beside your open bags. Each click deletes "
@@ -55,11 +66,11 @@ local OPTIONS = {
 	{ label = "Take whitelisted items out of trades", option = setting("guardTrades"),
 		help = "If you put a whitelisted item in the trade window, it's taken straight back out. "
 			.. "Take it off the whitelist first to trade it on purpose." },
-	{ label = "Combine partial stacks when bags are full", option = setting("mergeStacks"),
-		help = "When your normal bags fill up, merges partial stacks of the same item (including into a "
+	{ label = "Combine partial stacks (from the slider above)", option = setting("mergeStacks"),
+		help = "Once your normal bags are as full as the slider says, merges partial stacks of the same item (including into a "
 			.. "partial stack in your quiver or a profession bag) when that frees a slot." },
-	{ label = "Move items into special bags when bags are full", option = setting("moveToSpecialBags"),
-		help = "When your normal bags fill up, moves ammo into your quiver or ammo pouch, leather into a "
+	{ label = "Move items into special bags (from the slider above)", option = setting("moveToSpecialBags"),
+		help = "Once your normal bags are as full as the slider says, moves ammo into your quiver or ammo pouch, leather into a "
 			.. "leatherworking bag, herbs into an herb bag and so on, if there's a free slot there." },
 	{ label = "Buy ammo at vendors (Huntard)",
 		option = {
@@ -183,6 +194,7 @@ end
 
 local function sync(page)
 	for o, box in pairs(page.boxes) do box:SetChecked(o.option.get() and true or false) end
+	for _, s in ipairs(page.sliders) do s() end
 end
 
 local function syncVisible()
@@ -191,29 +203,101 @@ local function syncVisible()
 	end
 end
 
+-- Rows an option takes on the page: a slider (label + bar) takes two.
+local function rowsOf(o) return o.slider and 2 or 1 end
+local function totalRows()
+	local n = 0
+	for _, o in ipairs(visibleOptions()) do n = n + rowsOf(o) end
+	return n
+end
+
+local function addTooltip(frame, o)
+	frame:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:AddLine(o.label, 1, 1, 1)
+		GameTooltip:AddLine(o.help, nil, nil, nil, true)
+		GameTooltip:Show()
+	end)
+	frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
+-- A plain slider (no template: template availability varies between clients).
+local function buildSlider(container, o, x, y, width)
+	local spec = o.slider
+	local label = container:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	label:SetPoint("TOPLEFT", x + 6, y - 4)
+	label:SetText(o.label)
+	local valueText = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	valueText:SetPoint("TOPRIGHT", container, "TOPLEFT", x + width, y - 4)
+
+	local slider = CreateFrame("Slider", nil, container)
+	slider:SetOrientation("HORIZONTAL")
+	slider:SetPoint("TOPLEFT", x + 10, y - 26)
+	slider:SetSize(width - 14, 16)
+	slider:SetMinMaxValues(spec.min, spec.max)
+	slider:SetValueStep(spec.step)
+	slider:SetObeyStepOnDrag(true)
+	slider:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+	slider:EnableMouseWheel(true)
+	local track = slider:CreateTexture(nil, "BACKGROUND")
+	track:SetPoint("LEFT")
+	track:SetPoint("RIGHT")
+	track:SetHeight(4)
+	track:SetColorTexture(0.4, 0.4, 0.4, 0.9)
+	local left = container:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	left:SetPoint("TOPLEFT", slider, "BOTTOMLEFT", 0, -1)
+	left:SetText(spec.leftText)
+	local right = container:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	right:SetPoint("TOPRIGHT", slider, "BOTTOMRIGHT", 0, -1)
+	right:SetText(spec.rightText)
+
+	local syncing = false
+	local function syncSlider()
+		local value = o.option.get()
+		syncing = true
+		slider:SetValue(value)
+		syncing = false
+		valueText:SetText(spec.describe(value))
+	end
+	slider:SetScript("OnValueChanged", function(_, value)
+		if syncing then return end
+		value = math.floor(value / spec.step + 0.5) * spec.step
+		if value == o.option.get() then return end
+		o.option.set(value)
+		valueText:SetText(spec.describe(value))
+		if o.after then o.after() end
+	end)
+	slider:SetScript("OnMouseWheel", function(self, delta)
+		self:SetValue(self:GetValue() + delta * spec.step)
+	end)
+	addTooltip(slider, o)
+	container.sliders[#container.sliders + 1] = syncSlider
+end
+
 local function buildPage(container, x, y)
 	container.boxes = {}
-	local options = visibleOptions()
-	for i, o in ipairs(options) do
-		local box = CreateFrame("CheckButton", nil, container, "UICheckButtonTemplate")
-		box:SetPoint("TOPLEFT", x, y - (i - 1) * ROW_SPACING)
-		box.Text:SetText(o.label)
-		box.Text:SetFontObject("GameFontHighlight")
-		box:SetScript("OnClick", function(self)
-			o.option.set(self:GetChecked() and true or false)
-			if o.after then o.after() end
-			syncVisible()
-		end)
-		box:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:AddLine(o.label, 1, 1, 1)
-			GameTooltip:AddLine(o.help, nil, nil, nil, true)
-			GameTooltip:Show()
-		end)
-		box:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		container.boxes[o] = box
+	container.sliders = {}
+	local row = 0
+	for _, o in ipairs(visibleOptions()) do
+		local rowY = y - row * ROW_SPACING
+		if o.slider then
+			buildSlider(container, o, x, rowY, LISTS_WIDTH + 6)
+		else
+			local box = CreateFrame("CheckButton", nil, container, "UICheckButtonTemplate")
+			box:SetPoint("TOPLEFT", x, rowY)
+			box.Text:SetText(o.label)
+			box.Text:SetFontObject("GameFontHighlight")
+			box:SetScript("OnClick", function(self)
+				o.option.set(self:GetChecked() and true or false)
+				if o.after then o.after() end
+				syncVisible()
+			end)
+			addTooltip(box, o)
+			container.boxes[o] = box
+		end
+		row = row + rowsOf(o)
 	end
-	local colorsY = y - #options * ROW_SPACING - 12
+	local colorsY = y - row * ROW_SPACING - 12
 	buildColors(container, x + 6, colorsY, LISTS_WIDTH)
 	ns.BuildLists(container, x + 6, colorsY - COLORS_HEIGHT, LISTS_WIDTH)
 	container:HookScript("OnShow", sync)
@@ -223,7 +307,7 @@ end
 -- Blizzard's standard window style (portrait, title bar, inset).
 local function createWindow()
 	window = CreateFrame("Frame", "AutoVendorSettings", UIParent, "ButtonFrameTemplate")
-	window:SetSize(WIDTH, 120 + #visibleOptions() * ROW_SPACING + COLORS_HEIGHT + ns.LISTS_HEIGHT)
+	window:SetSize(WIDTH, 120 + totalRows() * ROW_SPACING + COLORS_HEIGHT + ns.LISTS_HEIGHT)
 	window:SetTitle("AutoVendor")
 	window:SetPortraitToAsset(ICON)
 	window:SetPoint("CENTER")

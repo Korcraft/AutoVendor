@@ -11,15 +11,15 @@ A small World of Warcraft addon (WoW Forever client).
 - **Colours:** every outline colour (whitelist, blacklist, bank list, protect once, sell once, bank once, delete suggestion) can be changed on its own in /av: click a swatch to pick a colour, right-click it to put it back. "Reset colours" restores them all.
   - Sell one to a vendor by hand anyway and it's bought straight back; put one in a trade window and it's taken straight back out - with a raid-warning-style popup and sound (only you see it). (The game doesn't let addons block a sale or trade, so this is an instant undo.)
 - Both work in the default bags and in [Baganator](https://www.curseforge.com/wow/addons/baganator); with any other bag addon type `/av sell` or `/av protect` and Shift+click the item. Marks are per item type and shared by all your characters.
-- **Combine stacks:** when your normal bags fill up, partial stacks of the same item are merged first (including into a partial stack in your quiver or a profession bag), if that frees a slot.
-- **Special bags:** when your normal bags fill up, items that belong in a special bag (ammo in a quiver or ammo pouch, leather in a leatherworking bag, herbs in an herb bag...) are moved there automatically if it has a free slot.
+- **Combine stacks:** when your normal bags fill up (or are as full as the slider says, see below), partial stacks of the same item are merged first (including into a partial stack in your quiver or a profession bag), if that frees a slot.
+- **Special bags:** when your normal bags fill up (or are as full as the slider says), items that belong in a special bag (ammo in a quiver or ammo pouch, leather in a leatherworking bag, herbs in an herb bag...) are moved there automatically if it has a free slot.
 - **Bags full?** AutoVendor tells you the least valuable item to delete. Only your normal bags count - special bags are ignored:
   - items you marked to sell come first
   - never suggests protected items, profession/gathering tools (skinning knife, mining pick, fishing poles...), quest items, keys, or items with no vendor price
   - food, drink, potions, reagents and ammo are only suggested as a last resort
   - if two partial stacks can be merged, it tells you that first
   - open your bags while they're full and the cheapest item gets a hot pink outline (default bags and Baganator) and a tooltip line; delete it and the next cheapest lights up, and so on until you close your bags
-  - turn on "Always show the delete suggestion" in /av to get the outline and the Delete button whenever your bags are open, full or not (off by default)
+  - **When to start:** the "Suggest deletes and tidy stacks from" slider in /av sets how full your normal bags must be first: all the way left = always, all the way right = only when full (the default), in 10% steps. Combining stacks and moving into special bags follow the same slider. Early tidying waits until your bags have been still for 2 seconds, never runs while you hold an item, in combat, or with a vendor, bank, trade or mail window open, and never touches an item you split by hand in the last 2 minutes.
   - a **Delete** button sits beside your open bags while something is outlined: each click deletes the pink item, then the next one lights up, so keep clicking until you have room. One item per click; rare or better asks first. Turn it off in /av
   - it never deletes anything itself
 
