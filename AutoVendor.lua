@@ -382,10 +382,36 @@ end
 -- The one place that decides what a modified click on a bag item means, so
 -- every bag UI behaves the same. Returns true if the click was ours. `bag`
 -- and `slot` say which stack a one-time mark goes on.
+-- Ctrl+click on an item opens the dressing room, and the game does that before
+-- our click hook runs. So each dressing room window notes when it opened, and a
+-- Ctrl+Alt+click closes one that opened on that same click. (One you already
+-- had open stays open.)
+local dressUpShownAt = {}
+local function watchDressUp()
+	for _, name in ipairs({ "DressUpFrame", "SideDressUpFrame" }) do
+		local f = _G[name]
+		if f and not dressUpShownAt[f] then
+			-- Hooked only now and already open: it loaded on this very click.
+			dressUpShownAt[f] = f:IsShown() and GetTime() or -1
+			f:HookScript("OnShow", function(self) dressUpShownAt[self] = GetTime() end)
+		end
+	end
+end
+local function closeDressUpFromThisClick()
+	watchDressUp() -- in case a dressing room frame loads late
+	for f, shownAt in pairs(dressUpShownAt) do
+		if shownAt == GetTime() and f:IsShown() then
+			if HideUIPanel then HideUIPanel(f) end
+			if f:IsShown() then f:Hide() end
+		end
+	end
+end
+
 function ns.HandleItemClick(mouseButton, itemID, itemLink, bag, slot)
 	if not itemID then return false end
 	local alt, ctrl, shift = IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
 	if not alt or shift then return false end
+	if ctrl then closeDressUpFromThisClick() end
 	-- Alt = one-time mark; Ctrl+Alt = permanent list.
 	if mouseButton == "LeftButton" then
 		if ctrl then togglePermanent("sell", itemID, itemLink) else toggleOnce("sell", itemID, itemLink, bag, slot) end
@@ -468,6 +494,7 @@ events:SetScript("OnEvent", function(self, event, addonName)
 			if AutoVendorDB.settings[key] == nil then AutoVendorDB.settings[key] = default end
 		end
 		registerWithBaganator()
+		watchDressUp()
 		return
 	end
 	if event == "BAG_UPDATE_DELAYED" then
