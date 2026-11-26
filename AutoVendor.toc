@@ -3,7 +3,7 @@
 ## Title: AutoVendor
 ## Notes: Sells grays and your blacklist, repairs, and guards your whitelist at vendors. Suggests what to delete when bags are full. Alt+click = once, Ctrl+Alt+click = always.
 ## Author: Korcraft
-## Version: 1.3.0
+## Version: 1.3.1
 ## SavedVariables: AutoVendorDB
 ## SavedVariablesPerCharacter: AutoVendorCharDB
 ## OptionalDeps: Baganator
