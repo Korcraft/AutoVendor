@@ -14,7 +14,7 @@ A small World of Warcraft addon (WoW Forever client).
 - **Combine stacks:** when your normal bags fill up (or are as full as the slider says, see below), partial stacks of the same item are merged first (including into a partial stack in your quiver or a profession bag), if that frees a slot.
 - **Special bags:** when your normal bags fill up (or are as full as the slider says), items that belong in a special bag (ammo in a quiver or ammo pouch, leather in a leatherworking bag, herbs in an herb bag...) are moved there automatically if it has a free slot.
 - **Bags full?** AutoVendor tells you the least valuable item to delete. Only your normal bags count - special bags are ignored:
-  - items you marked to sell come first
+  - always the cheapest whole stack (vendor price x count); marking something to sell doesn't move it up
   - never suggests protected items, profession/gathering tools (skinning knife, mining pick, fishing poles...), quest items, keys, or items with no vendor price
   - food, drink, potions, reagents and ammo are only suggested as a last resort
   - if two partial stacks can be merged, it tells you that first

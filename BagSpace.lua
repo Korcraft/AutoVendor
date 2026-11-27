@@ -6,8 +6,8 @@
 -- close your bags. Next time they're full and you open them, it starts again.
 --
 -- How it picks:
---   * Items marked to sell (Alt+left-click or blacklist) come first: you already said
---     they're junk.
+--   * Items marked to sell (Alt+left-click or blacklist) get no head start:
+--     they rank by price like everything else.
 --   * Never suggested: protected or whitelisted items, gathering and
 --     profession tools (skinning knife, mining pick, fishing poles...), quest
 --     items, keys, items with no vendor price (hearthstone and the like), and
@@ -138,10 +138,10 @@ local function describe(bag, slot, info)
 	return e
 end
 
--- Lower sorts first: marked-to-sell, then ordinary, then last-resort; within
--- each, cheaper first, then lower quality, then fewer items.
+-- Lower sorts first: ordinary, then last-resort; within each, cheaper first,
+-- then lower quality, then fewer items. Being marked to sell doesn't change
+-- an item's place.
 local function better(a, b)
-	if a.marked ~= b.marked then return a.marked end
 	if (a.lastResort ~= nil) ~= (b.lastResort ~= nil) then return a.lastResort == nil end
 	if a.value ~= b.value then return a.value < b.value end
 	if a.quality ~= b.quality then return a.quality < b.quality end
