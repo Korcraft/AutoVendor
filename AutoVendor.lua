@@ -28,7 +28,9 @@ local QUALITY_POOR = (Enum and Enum.ItemQuality and Enum.ItemQuality.Poor) or 0
 local SELL_BATCH = 10
 local SELL_DELAY = 0.25
 local REPAIR_DELAY = 0.4 -- lets the sale money arrive before repairing
-local MAX_PASSES = 40 -- stops retrying an item that stays locked
+local MAX_PASSES = 80 -- stops retrying an item that stays locked
+local RESEND_AFTER = 1.5 -- seconds before a sale that didn't land is sent again
+local MAX_TRIES = 3
 
 -- Bumped on every open and close, so a pending timer from an earlier visit
 -- can tell it's stale and stop.
@@ -226,6 +228,20 @@ local function finish(id, state)
 	C_Timer.After(REPAIR_DELAY, function()
 		if id ~= session then return end
 
+		-- Count only what actually left the bags.
+		state.count, state.earned = 0, 0
+		local unsold = 0
+		for key, sent in pairs(state.sent) do
+			local bag, slot = key:match("^(%-?%d+):(%d+)$")
+			local info = C_Container.GetContainerItemInfo(tonumber(bag), tonumber(slot))
+			if info and info.itemID == sent.itemID then
+				unsold = unsold + 1
+			else
+				state.count = state.count + 1
+				state.earned = state.earned + sent.price
+			end
+		end
+
 		local repaired, unpaid
 		if AutoVendorDB.settings.repair then repaired, unpaid = repairAll() end
 		local parts = {}
@@ -238,6 +254,10 @@ local function finish(id, state)
 		elseif unpaid then
 			parts[#parts + 1] = "not enough gold to repair (" .. formatMoney(unpaid) .. ")"
 		end
+		if unsold > 0 then
+			parts[#parts + 1] = unsold .. (unsold == 1 and " item" or " items")
+				.. " wouldn't sell (close and reopen the vendor to try again)"
+		end
 		if #parts > 0 then
 			print(PREFIX .. table.concat(parts, ", ") .. ".")
 		end
@@ -248,19 +268,30 @@ local function sellPass(id, state)
 	if id ~= session then return end
 	state.passes = state.passes + 1
 
+	-- A sale the server dropped leaves the item sitting there unlocked. Such
+	-- a slot is sent again after RESEND_AFTER seconds, up to MAX_TRIES times.
+	local now = GetTime()
 	local soldThisPass, moreToDo = 0, false
 	for bag = FIRST_BAG, LAST_BAG do
 		for slot = 1, C_Container.GetContainerNumSlots(bag) do
 			local info = C_Container.GetContainerItemInfo(bag, slot)
 			local key = bag .. ":" .. slot
-			if shouldSell(info, bag, slot) and not state.sent[key] then
+			local sent = state.sent[key]
+			if sent and not (info and info.itemID == sent.itemID) then
+				sent = nil -- that sale went through (or the slot changed)
+			end
+			if shouldSell(info, bag, slot) then
 				if info.isLocked or soldThisPass >= SELL_BATCH then
 					moreToDo = true
-				else
-					state.sent[key] = true
-					state.count = state.count + 1
-					state.earned = state.earned + sellPriceOf(info)
+				elseif sent and now - sent.t < RESEND_AFTER then
+					moreToDo = true -- give the sale time to land
+				elseif not sent or sent.tries < MAX_TRIES then
+					state.sent[key] = {
+						itemID = info.itemID, price = sellPriceOf(info),
+						tries = (sent and sent.tries or 0) + 1, t = now,
+					}
 					soldThisPass = soldThisPass + 1
+					moreToDo = true
 					C_Container.UseContainerItem(bag, slot)
 				end
 			end
